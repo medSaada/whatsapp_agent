@@ -14,7 +14,7 @@ app.include_router(api_router, prefix=settings.API_V1_STR)
 
 @app.get("/")
 def read_root():
-    return {"message": "WhatsApp Agent is running"}
+    return {"message": "Med Saada WhatsApp Agent is running"}
 
 if __name__ == "__main__":
     # So we don't need to write uvicorn main:app --reload every time

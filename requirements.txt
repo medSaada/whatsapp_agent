@@ -4,3 +4,8 @@ requests
 pydantic
 python-dotenv 
 pydantic-settings
+
+# Testing
+pytest
+httpx
+pytest-mock

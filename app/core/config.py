@@ -1,11 +1,10 @@
 import os
 from pydantic_settings import BaseSettings
-# from dotenv import load_dotenv
-
-# load_dotenv()
 
 class Settings(BaseSettings):
-    # Meta WhatsApp API Credentials
+    """
+    Settings for the application
+    """
     META_ACCESS_TOKEN: str
     META_VERIFY_TOKEN: str
     META_WABA_ID: str
@@ -23,7 +22,7 @@ class Settings(BaseSettings):
     def GRAPH_API_URL(self) -> str:
         return f"https://graph.facebook.com/{self.GRAPH_API_VERSION}"
     
-    class Config:
+    class Config:     
         env_file = ".env"
 
 

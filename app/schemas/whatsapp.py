@@ -7,8 +7,9 @@ from typing import List, Optional
 class WebhookChangeValue(BaseModel):
     messaging_product: str
     metadata: dict
-    contacts: List[dict]
-    messages: List[dict]
+    contacts: Optional[List[dict]] = None
+    messages: Optional[List[dict]] = None
+    statuses: Optional[List[dict]] = None
 
 class WebhookChange(BaseModel):
     value: WebhookChangeValue
