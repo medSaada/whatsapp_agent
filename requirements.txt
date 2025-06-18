@@ -3,3 +3,4 @@ uvicorn[standard]
 requests
 pydantic
 python-dotenv 
+pydantic-settings

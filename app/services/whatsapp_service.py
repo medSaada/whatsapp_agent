@@ -1,8 +1,18 @@
 from app.schemas.whatsapp import WebhookPayload
-from app.services.meta_api_client import meta_api_client
+from app.services.meta_api_client import MetaAPIClient
+from app.core.config import Settings, get_settings
+from fastapi import Depends
 import logging
 
 class WhatsAppService:
+    def __init__(self, settings: Settings = Depends(get_settings)):
+        """
+        Initializes the service with settings and a Meta API client.
+        FastAPI's dependency injection will provide the settings.
+        """
+        self.settings = settings
+        self.meta_api_client = MetaAPIClient(settings=self.settings)
+
     def process_message(self, payload: WebhookPayload):
         """Processes an incoming webhook payload."""
         for entry in payload.entry:
@@ -18,6 +28,4 @@ class WhatsAppService:
                         # --- Your agent logic goes here ---
                         # For now, we just echo the message back.
                         reply_message = f"You said: {message_text}"
-                        meta_api_client.send_text_message(sender_id, reply_message)
-                        
-whatsapp_service = WhatsAppService() 
+                        self.meta_api_client.send_text_message(sender_id, reply_message) 

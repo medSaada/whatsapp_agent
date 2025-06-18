@@ -1,12 +1,13 @@
 import requests
-from app.core.config import settings
+from app.core.config import Settings
 import logging
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 class MetaAPIClient:
-    def __init__(self):
+    def __init__(self, settings: Settings):
+        """Initializes the client with the application settings."""
         self.base_url = settings.GRAPH_API_URL
         self.access_token = settings.META_ACCESS_TOKEN
         self.sender_phone_id = settings.META_PHONE_NUMBER_ID
@@ -34,6 +35,4 @@ class MetaAPIClient:
         except requests.exceptions.RequestException as e:
             logger.error(f"Error sending message to {to}: {e}")
             logger.error(f"Response body: {e.response.text if e.response else 'No response'}")
-            return None
-
-meta_api_client = MetaAPIClient() 
+            return None 

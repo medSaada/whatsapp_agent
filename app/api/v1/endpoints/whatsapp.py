@@ -1,15 +1,18 @@
-from fastapi import APIRouter, Request, Response, HTTPException, status
+from fastapi import APIRouter, Request, Response, HTTPException, status, Depends
 from app.schemas.whatsapp import WebhookPayload
-from app.services.whatsapp_service import whatsapp_service
-from app.core.config import settings
+from app.services.whatsapp_service import WhatsAppService
+from app.core.config import Settings, get_settings
 import logging
 
 router = APIRouter()
 
 @router.get("/webhook")
-def verify_webhook(request: Request):
+def verify_webhook(
+    request: Request, settings: Settings = Depends(get_settings)
+):
     """
     Handles the webhook verification request from Meta.
+    It uses the injected settings to access the verify token.
     """
     mode = request.query_params.get("hub.mode")
     token = request.query_params.get("hub.verify_token")
@@ -26,12 +29,15 @@ def verify_webhook(request: Request):
         )
 
 @router.post("/webhook")
-async def process_webhook(payload: WebhookPayload):
+async def process_webhook(
+    payload: WebhookPayload, service: WhatsAppService = Depends()
+):
     """
     Handles incoming messages and other events from WhatsApp.
+    It uses the injected WhatsAppService to process the payload.
     """
     try:
-        whatsapp_service.process_message(payload)
+        service.process_message(payload)
         return Response(status_code=status.HTTP_200_OK)
     except Exception as e:
         logging.error(f"Error processing webhook: {e}", exc_info=True)
