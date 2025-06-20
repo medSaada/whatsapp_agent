@@ -9,6 +9,11 @@ class Settings(BaseSettings):
     META_VERIFY_TOKEN: str
     META_WABA_ID: str
     META_PHONE_NUMBER_ID: str
+    OPENAI_API_KEY: str
+    HF_TOKEN: str
+    LANGSMITH_API_KEY: str
+    COHERE_API_KEY: str
+
 
     # Application Settings
     APP_HOST: str = "0.0.0.0"
@@ -18,9 +23,18 @@ class Settings(BaseSettings):
     # Graph API
     GRAPH_API_VERSION: str = "v20.0"
     
+    # Document paths for RAG
+    DOCUMENT_PATH_1: str 
+    DOCUMENT_PATH_2: str
+    
     @property
     def GRAPH_API_URL(self) -> str:
         return f"https://graph.facebook.com/{self.GRAPH_API_VERSION}"
+    
+    @property
+    def DOCUMENT_PATHS(self) -> list[str]:
+        """Get list of document paths for RAG"""
+        return [self.DOCUMENT_PATH_1, self.DOCUMENT_PATH_2]
     
     class Config:     
         env_file = ".env"
