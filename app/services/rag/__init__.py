@@ -1,3 +1,2 @@
 from .chunking_service import test_basic_chunking, test_combined_chunking, test_semantic_chunking, test_separator_chunking
-from .rag_service import RAGService
-from .rag_example import example_basic_rag, example_semantic_chunking, example_combined_chunking, example_vector_store_management
+from .vector_store_service import VectorStoreConfig, VectorStoreService
