@@ -10,7 +10,7 @@ import shutil
 from datetime import datetime
 
 # Configure logging
-logging.basicConfig(level=logging.INFO)
+logging.basicConfig(level=logging.WARNING)
 logger = logging.getLogger(__name__)
 
 @dataclass(frozen=True)
@@ -493,17 +493,16 @@ class VectorStoreService:
     
     def cleanup(self):
         """Clean up resources"""
-        logger.info("Cleaning up VectorStoreService resources")
-        
-        # Persist all vector stores
         for name, store in self._vector_stores.items():
             try:
                 store.persist()
-                logger.info(f"Persisted collection '{name}'")
+                # Close Chroma client
+                if name in self._chroma_clients:
+                    self._chroma_clients[name].reset()  # Reset client
+                    del self._chroma_clients[name]
             except Exception as e:
-                logger.error(f"Error persisting collection '{name}': {e}")
+                logger.warning(f"Cleanup warning for {name}: {e}")
         
-        # Clear memory references
         self._vector_stores.clear()
         self._collections_info.clear()
         

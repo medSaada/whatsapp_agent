@@ -56,7 +56,7 @@ except ImportError:
     PROJECT_ROOT = get_project_root()
 
 # Configure logging
-logging.basicConfig(level=logging.INFO)
+logging.basicConfig(level=logging.WARNING)
 logger = logging.getLogger(__name__)
 
 class ArabicTextHandler:

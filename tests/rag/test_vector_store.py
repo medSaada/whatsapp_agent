@@ -24,33 +24,22 @@ def test_vector_store_service():
     )
 ]    
     #create a vector store service
-    vector_service = VectorStoreService(config)
+    vector_service = VectorStoreService(config, embedding_model=OpenAIEmbeddings())
     #create a collection
     collection_name = "test_collection"
     vector_service.create_collection(collection_name, documents)
-    #search a collection
-    query = "What is the meaning of life?"
+    #load the collection
+    collection = vector_service.load_collection(collection_name)
+    assert collection is not None, "Collection should be loaded successfully"
+    #search the collection
+    query = "What is the main idea of the document?"
     results = vector_service.search_collection(collection_name, query)
-    assert len(results) > 0
-    #delete a collection
-    vector_service.delete_collection(collection_name)
-    # Nouveaux documents
- # Ajout de documents à une collection existante
-    new_documents = [
-        Document(
-            page_content="Le deep learning utilise des réseaux de neurones profonds.",
-            metadata={"source": "deep_learning.txt", "category": "technology"}
-        )
-    ]
-
-    # Ajouter à la collection existante
-    updated_info = vector_service.add_documents_to_collection(
-        collection_name="faq",
-        documents=new_documents
-    )
-
-    print(f"Documents ajoutés. Total: {updated_info.document_count}")
-
-    #nettoyer
+    assert results.total_results > 0, "Search results should be returned successfully"
+    # clean up before deleting the collection
     vector_service.cleanup()
+    #delete the collection
+    vector_service.delete_collection(collection_name)
+    #nettoyer
+ 
         
+
