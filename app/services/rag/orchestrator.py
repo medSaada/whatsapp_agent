@@ -1,13 +1,15 @@
 from typing import List, Optional, Dict, Any
 from langchain_core.documents import Document
 from langchain_core.messages import HumanMessage
+from langchain_core.prompts import BasePromptTemplate
 from langchain_community.embeddings import OpenAIEmbeddings
+from langchain_openai import ChatOpenAI
 import logging
 from pathlib import Path
 
 from app.services.rag.vector_store_service import VectorStoreService, VectorStoreConfig
 from app.services.rag.generation_service import GenerationService
-from app.core.prompt import QNA_TEMPLATE_RAG, PROMPT_TELECOM_RAG
+from app.core.prompt import  PERSONA_PROMPT
 from app.services.rag.graph.builder import GraphBuilder
 from app.services.rag.graph.tools import create_rag_tool
 
@@ -29,7 +31,8 @@ class RAGOrchestrator:
                  collection_name: str = "production_collection",
                  model_name: str = "gpt-4.1",
                  temperature: float = 0.2,
-                 db_path: str = "data/sqlite/conversation_memory.db"):
+                 db_path: str = "data/sqlite/conversation_memory.db",
+                 persona_prompt: Optional[str] = None):
         """
         Initialize the RAG Orchestrator services.
         The agent graph is not built here, but on-demand.
@@ -39,8 +42,10 @@ class RAGOrchestrator:
         self._graph = None # The graph will be built lazily
         
         # 1. Initialize core services
+        prompt = persona_prompt if persona_prompt else PERSONA_PROMPT
+        llm = ChatOpenAI(model=model_name, temperature=temperature)
         self.vector_store_service = self._init_vector_store(vector_store_path, collection_name)
-        self.generation_service = self._init_generation_service(model_name, temperature)
+        self.generation_service = self._init_generation_service(llm, prompt)
         
         logger.info(f"RAG Orchestrator initialized for collection: {collection_name}")
     
@@ -71,11 +76,12 @@ class RAGOrchestrator:
         config = VectorStoreConfig(store_path=store_path, collection_name=collection_name)
         return VectorStoreService(config)
 
-    def _init_generation_service(self, model_name: str, temperature: float) -> GenerationService:
+    def _init_generation_service(
+        self, llm: ChatOpenAI, persona_prompt: str
+    ) -> GenerationService:
         return GenerationService(
-            model_name=model_name,
-            temperature=temperature,
-            prompt_template=PROMPT_TELECOM_RAG
+            llm=llm,
+            persona_prompt=persona_prompt,
         )
 
     def answer_question(self, question: str, conversation_id: str) -> str:

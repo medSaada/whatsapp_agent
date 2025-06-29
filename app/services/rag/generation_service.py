@@ -3,8 +3,12 @@ from langchain_openai import ChatOpenAI
 from langchain_core.documents import Document
 from typing import List, Optional
 import logging
-from app.core.prompt import QNA_TEMPLATE_RAG
-from langchain.prompts import ChatPromptTemplate, MessagesPlaceholder
+from app.core.prompt import (
+    PERSONA_PROMPT, 
+    RAG_DATA_TEMPLATE, 
+    AGENT_TOOL_INSTRUCTION
+)
+from langchain.prompts import ChatPromptTemplate, MessagesPlaceholder, BasePromptTemplate
 logger = logging.getLogger(__name__)
 
 """
@@ -19,46 +23,34 @@ class GenerationService:
     """Service for generating responses using LLM with RAG context"""
     
     def __init__(self, 
-                 model_name: str = "gpt-3.5-turbo",
-                 temperature: float = 0.1,
-                 prompt_template: Optional[str] = None):
+                 llm: ChatOpenAI,
+                 persona_prompt: Optional[str] = None):
         """
         Initialize GenerationService
         
         Args:
-            model_name: LLM model name
-            temperature: Model temperature (0.0 to 1.0)
-            prompt_template: Custom prompt template
+            llm: An initialized LangChain ChatOpenAI instance.
+            persona_prompt: A string defining the persona of the AI.
         """
-        # Fail Fast validation
-        if not model_name or not model_name.strip():
-            raise ValueError("model_name cannot be empty")
+        if not llm:
+            raise ValueError("llm instance cannot be None")
         
-        if not 0.0 <= temperature <= 1.0:
-            raise ValueError("temperature must be between 0.0 and 1.0")
+        self.llm = llm
         
-        self.model_name = model_name
-        self.temperature = temperature
-        self.llm = ChatOpenAI(model=model_name, temperature=temperature)
+        # Default persona prompt if none provided
+        self.persona_prompt = persona_prompt or self._get_default_persona_prompt()
         
-        # Default prompt template if none provided
-        self.prompt_template = prompt_template or self._get_default_prompt()
-        
-        logger.info(f"GenerationService initialized with model: {model_name}")
+        logger.info(f"GenerationService initialized with model: {self.llm.model_name}")
     
     def get_agent_runnable(self, tools: List) -> 'Runnable':
         """
         Creates and returns a LangChain runnable that binds the LLM with 
         the system prompt and the necessary tools for the agent.
         """
-        # Bind the tools to the LLM
         llm_with_tools = self.llm.bind_tools(tools)
         
-        # Adapt the RAG prompt to a system prompt for the agent
-        system_prompt_str = self.prompt_template.replace(
-            "{context}", 
-            "Use the documents from the 'knowledge_base_retriever' tool to answer the user's question."
-        ).replace("{question}", "")
+        # Compose the system prompt from the persona and the agent instructions.
+        system_prompt_str = f"{self.persona_prompt}\n\n{AGENT_TOOL_INSTRUCTION}"
 
         # Create the agent's prompt structure
         agent_prompt = ChatPromptTemplate.from_messages([
@@ -69,9 +61,9 @@ class GenerationService:
         # Return the complete runnable chain
         return agent_prompt | llm_with_tools
     
-    def _get_default_prompt(self) -> str:
+    def _get_default_persona_prompt(self) -> str:
         """Get default RAG prompt template"""
-        return PROMPT_TELECOM_RAG
+        return PERSONA_PROMPT
     
 
     def generate_response(self, 
@@ -95,8 +87,9 @@ class GenerationService:
         
         
         try:
-            # Create prompt template
-            prompt = ChatPromptTemplate.from_template(self.prompt_template)
+            # Compose the full RAG prompt from the persona and the data template.
+            full_rag_prompt_str = f"{self.persona_prompt}\n\n{RAG_DATA_TEMPLATE}"
+            prompt = ChatPromptTemplate.from_template(full_rag_prompt_str)
             
             # Format prompt
             formatted_prompt = prompt.format(
@@ -144,9 +137,9 @@ class GenerationService:
     def get_model_info(self) -> dict:
         """Get model information"""
         return {
-            "model_name": self.model_name,
-            "temperature": self.temperature,
-            "prompt_template_length": len(self.prompt_template)
+            "model_name": self.llm.model_name,
+            "temperature": self.llm.temperature,
+            "persona_prompt_length": len(self.persona_prompt)
         }
     
    
