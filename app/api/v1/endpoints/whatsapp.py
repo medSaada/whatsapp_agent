@@ -1,10 +1,23 @@
 from fastapi import APIRouter, Request, Response, HTTPException, status, Depends
 from app.schemas.whatsapp import WebhookPayload
 from app.services.whatsapp_service import WhatsAppService
+from app.services.rag.orchestrator import RAGOrchestrator
 from app.core.config import Settings, get_settings
 import logging
 
 router = APIRouter()
+logger = logging.getLogger(__name__)
+
+# Dependency to get the shared RAG orchestrator from the application state
+def get_rag_orchestrator(request: Request) -> RAGOrchestrator:
+    return request.app.state.rag_orchestrator
+
+# Dependency to create a WhatsAppService with its required dependencies
+def get_whatsapp_service(
+    settings: Settings = Depends(get_settings),
+    rag_orchestrator: RAGOrchestrator = Depends(get_rag_orchestrator)
+) -> WhatsAppService:
+    return WhatsAppService(rag_orchestrator=rag_orchestrator, settings=settings)
 
 @router.get("/webhook")
 def verify_webhook(
@@ -30,7 +43,7 @@ def verify_webhook(
 
 @router.post("/webhook")
 async def process_webhook(
-    payload: WebhookPayload, service: WhatsAppService = Depends()
+    payload: WebhookPayload, service: WhatsAppService = Depends(get_whatsapp_service)
 ):
     """
     Handles incoming messages and other events from WhatsApp.

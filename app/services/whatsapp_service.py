@@ -8,23 +8,16 @@ import logging
 logger = logging.getLogger(__name__)
 
 class WhatsAppService:
-    def __init__(self, settings: Settings = Depends(get_settings)):
+    def __init__(self, rag_orchestrator: RAGOrchestrator, settings: Settings):
         """
-        Initializes the service with settings and a Meta API client.
-        FastAPI's dependency injection will provide the settings.
+        Initializes the service with a shared RAG orchestrator and settings.
+        This follows the dependency injection pattern for better maintainability.
         """
         self.settings = settings
         self.meta_api_client = MetaAPIClient(settings=self.settings)
+        self.rag_orchestrator = rag_orchestrator
         
-        # Initialize RAG Orchestrator with existing vector store
-        self.rag_orchestrator = RAGOrchestrator(
-            vector_store_path="data/vector_store/test_store_documents",
-            collection_name="test_collection",
-            model_name="gpt-4",
-            temperature=0.2
-        )
-        
-        logger.info("WhatsAppService initialized with RAG capabilities")
+        logger.info("WhatsAppService initialized with a shared RAG orchestrator")
 
     def process_message(self, payload: WebhookPayload):
         """Processes an incoming webhook payload."""
@@ -38,8 +31,8 @@ class WhatsAppService:
                         message_text = message_data['text']['body']
                         logging.info(f"Received message from {sender_id}: '{message_text}'")
                         
-                        # Generate intelligent response using RAG
-                        reply_message = self._generate_rag_response(message_text)
+                        # Generate intelligent response using the stateful RAG agent
+                        reply_message = self._generate_rag_response(sender_id, message_text)
                         self.meta_api_client.send_text_message(sender_id, reply_message)
                 
                 # Handle message status updates
@@ -53,9 +46,10 @@ class WhatsAppService:
                 else:
                     logging.warning(f"Unhandled change value type: {change.value}")
     
-    def _generate_rag_response(self, user_message: str) -> str:
+    def _generate_rag_response(self, sender_id: str, user_message: str) -> str:
         """
-        Generate intelligent response using RAG (same approach as test_generation.py)
+        Generates an intelligent response using the stateful RAG agent.
+        The sender_id is used to maintain conversation history.
         """
         try:
             # Check if RAG system is ready
@@ -63,16 +57,19 @@ class WhatsAppService:
                 logger.warning("RAG system not ready, using fallback response")
                 return self._get_fallback_response(user_message)
             
-            # Generate RAG response using the same approach as test_generation.py
-            response = self.rag_orchestrator.answer_question(user_message, k=5)
+            # Generate a response using the agent, which maintains state via conversation_id
+            response = self.rag_orchestrator.answer_question(
+                question=user_message,
+                conversation_id=sender_id 
+            )
             
             # Log the interaction
-            logger.info(f"Generated RAG response for: '{user_message[:50]}...'")
+            logger.info(f"Generated RAG response for conversation '{sender_id}': '{user_message[:50]}...'")
             
             return response
             
         except Exception as e:
-            logger.error(f"Error generating RAG response: {e}")
+            logger.error(f"Error generating RAG response for conversation '{sender_id}': {e}", exc_info=True)
             return self._get_fallback_response(user_message)
     
     def _get_fallback_response(self, user_message: str) -> str:

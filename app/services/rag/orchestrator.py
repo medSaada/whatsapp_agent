@@ -1,128 +1,153 @@
 from typing import List, Optional, Dict, Any
 from langchain_core.documents import Document
+from langchain_core.messages import HumanMessage
 from langchain_community.embeddings import OpenAIEmbeddings
 import logging
 from pathlib import Path
 
 from app.services.rag.vector_store_service import VectorStoreService, VectorStoreConfig
 from app.services.rag.generation_service import GenerationService
+from app.core.prompt import QNA_TEMPLATE_RAG, PROMPT_TELECOM_RAG
+from app.services.rag.graph.builder import GraphBuilder
+from app.services.rag.graph.tools import create_rag_tool
 
 logger = logging.getLogger(__name__)
 
 # Use the same prompt template from test_generation.py
-QNA_TEMPLATE = "\n".join([
-    # Persona & Goal
-    "You are **Fatima-Zahra**, a **client support expert** at **Geniats**, an **e-learning coding academy** for **Moroccan kids aged 6–15**.",
-    "Your mission is to **respond to client messages in Moroccan Darija** (or in French only when necessary), with the goal of **convincing them to join and purchase our offer**.",
-    "You must sound like a **real Moroccan person**, **not an AI**—friendly, respectful, helpful and professional.",
 
-    # Language Rules
-    "## ⚠️ Language Rules",
-    "1. **Darija lines** use Arabic script and punctuation: comma `،`, question mark `؟`, exclamation `!`.",
-    "2. **French lines** use Latin script and punctuation: `, . ? ! : ;`.",
-    "3. **One line = one language**. To switch, end the line, insert a blank line, then continue in the other language.",
-    "4. **Never guess a Darija word**. If unsure, first check `document-conversation.pdf` or `data_caption.pdf`; if still unsure, reply in French or \"I don't know.\"",
-    "5. **If you choose to respond in Darija, you must write entirely in Arabic letters**—no Latin transliteration.",
-
-    # Reasoning Process
-    "## 🧩 Reasoning Process (Internal Steps)",
-    "1. **Comprehend** the client's question: identify their needs, doubts, and what they need to know before buying.",
-    "3. If you find an example, **adapt** it with a soft sales mindset: highlight benefits, address pain points, and guide them toward next steps.",
-    "4. **Compose** your answer in clear, correct Darija (in Arabic letters) or French if necessary.",
-    "5. **Verify** punctuation, script directionality, and no mixed-language lines.",
-
-    # Output Rules
-    "## 💬 Output Rules",
-    "- Deliver **one complete message**—no lists or step-by-step breakdowns.",
-    "- Tone: **warm, respectful, professional**, with natural Darija (and French where needed).",
-    "- Length: **as short or long as necessary** to fully answer the question.",
-    "- **If the client flirts** and you can tell it's a man, gently remind him of professional boundaries; otherwise respond kindly.",
-
-    # Conversation placeholders
-    "### Context:",
-    "{context}",
-    "",
-    "### Client Message:",
-    "{question}",
-    "",
-    "### Answer:",
-])
 
 class RAGOrchestrator:
-    """Simple RAG orchestrator for WhatsApp integration"""
+    """
+    High-level orchestrator for the RAG agent.
+
+    It initializes the necessary services and builds the agent graph on-demand
+    once the required data collection is available.
+    """
     
     def __init__(self, 
-                 vector_store_path: str = "data/vector_store/test_store_documents",
-                 collection_name: str = "test_collection",
-                 model_name: str = "gpt-4",
-                 temperature: float = 0.2):
+                 vector_store_path: str = "data/vector_store",
+                 collection_name: str = "production_collection",
+                 model_name: str = "gpt-4.1",
+                 temperature: float = 0.2,
+                 db_path: str = "data/sqlite/conversation_memory.db"):
         """
-        Initialize RAG Orchestrator with existing vector store
+        Initialize the RAG Orchestrator services.
+        The agent graph is not built here, but on-demand.
         """
-        self.vector_store_path = vector_store_path
         self.collection_name = collection_name
+        self.db_path = db_path
+        self._graph = None # The graph will be built lazily
         
-        # Initialize services
-        self._initialize_services(model_name, temperature)
+        # 1. Initialize core services
+        self.vector_store_service = self._init_vector_store(vector_store_path, collection_name)
+        self.generation_service = self._init_generation_service(model_name, temperature)
         
-        logger.info(f"RAG Orchestrator initialized with collection: {collection_name}")
+        logger.info(f"RAG Orchestrator initialized for collection: {collection_name}")
     
-    def _initialize_services(self, model_name: str, temperature: float):
-        """Initialize vector store and generation services"""
-        # Vector store configuration
-        config = VectorStoreConfig(
-            store_path=self.vector_store_path,
-            collection_name=self.collection_name
-        )
+    def _get_or_build_graph(self):
+        """
+        Builds the LangGraph agent on-demand.
         
-        # Initialize services
-        self.vector_store_service = VectorStoreService(config)
-        self.generation_service = GenerationService(
+        If the graph is already built, it returns the cached instance.
+        If not, it checks if the required collection exists and then builds it.
+        Returns None if the system is not ready.
+        """
+        if self._graph:
+            return self._graph
+
+        if not self.is_ready():
+            logger.warning(f"Cannot build graph: Collection '{self.collection_name}' not found or is empty.")
+            return None
+        
+        logger.info("Building LangGraph agent...")
+        rag_tool = create_rag_tool(self.vector_store_service, self.collection_name)
+        builder = GraphBuilder(self.generation_service, [rag_tool])
+        self._graph = builder.build(self.db_path)
+        logger.info("LangGraph agent built successfully.")
+        
+        return self._graph
+
+    def _init_vector_store(self, store_path: str, collection_name: str) -> VectorStoreService:
+        config = VectorStoreConfig(store_path=store_path, collection_name=collection_name)
+        return VectorStoreService(config)
+
+    def _init_generation_service(self, model_name: str, temperature: float) -> GenerationService:
+        return GenerationService(
             model_name=model_name,
             temperature=temperature,
-            prompt_template=QNA_TEMPLATE
+            prompt_template=PROMPT_TELECOM_RAG
         )
-    
-    def answer_question(self, question: str, k: int = 5) -> str:
+
+    def answer_question(self, question: str, conversation_id: str) -> str:
         """
-        Answer a question using RAG (same approach as test_generation.py)
+        Answer a question using the LangGraph agent, with detailed logging.
+        The graph is built on the first call if it hasn't been already.
         """
+        graph = self._get_or_build_graph()
+        
+        if not graph:
+            logger.warning("RAG system not ready, using fallback response.")
+            return "Je ne suis pas encore prêt à répondre aux questions. Veuillez réessayer dans un instant."
+
         try:
-            # Load collection
-            collection = self.vector_store_service.load_collection(self.collection_name)
-            if not collection:
-                logger.warning(f"Collection '{self.collection_name}' not found")
-                return "Je ne trouve pas d'information pertinente pour répondre à votre question."
+            config = {"configurable": {"thread_id": conversation_id}}
+            input_data = {"messages": [HumanMessage(content=question)]}
             
-            logger.info(f"Loaded collection with {collection.document_count} documents")
+            final_response = None
+            logger.info(f"--- Starting new RAG flow for conversation '{conversation_id}' ---")
             
-            # Search for relevant documents
-            search_result = self.vector_store_service.search_collection(
-                collection_name=self.collection_name,
-                query=question,
-                k=k
-            )
+            # Use the graph to stream events and find the final agent response
+            for event in graph.stream(input_data, config=config):
+                # Log every event type and its content for deep analysis
+                # logger.debug(f"Event: {event}")
+
+                if "call_tool" in event:
+                    tool_call = event["call_tool"]
+                    tool_name = tool_call.get('name')
+                    tool_input = tool_call.get('args')
+                    logger.info(f"[Tool Call] Agent called '{tool_name}' with input: {tool_input}")
+                
+                # Check for messages, especially tool outputs
+                if "messages" in event:
+                    last_message = event["messages"][-1]
+                    if last_message.type == "tool":
+                        logger.info(f"[Tool Output] Retrieved {len(last_message.content)} documents.")
+                        # To see the actual content, you can uncomment the next line, but it can be very verbose.
+                        # logger.debug(f"Retrieved content: {last_message.content}")
+
+                if "agent" in event:
+                    if messages := event["agent"].get("messages"):
+                        last_message = messages[-1]
+                        if not last_message.tool_calls and last_message.type == 'ai':
+                            final_response = last_message.content
+                            # The agent has made its final decision
+                            logger.info(f"[Final Answer] Agent generated final response.")
             
-            if not search_result.documents:
-                return "Je ne trouve pas d'information pertinente pour répondre à votre question."
-            
-            # Generate response using the same approach as test_generation.py
-            answer = self.generation_service.generate_response_with_documents(
-                question=question,
-                documents=list(search_result.documents)
-            )
-            
-            logger.info(f"Generated answer for question: '{question[:50]}...'")
-            return answer
-            
+            if final_response:
+                logger.info(f"--- RAG flow finished for conversation '{conversation_id}' ---")
+                return final_response
+            else:
+                logger.warning(f"Could not extract final response for conversation '{conversation_id}'")
+                return "Je n'ai pas pu générer de réponse."
+
         except Exception as e:
-            logger.error(f"Error answering question: {e}")
+            logger.error(f"Error answering question for conversation '{conversation_id}': {e}", exc_info=True)
             return f"Désolé, j'ai rencontré une erreur: {str(e)}"
     
     def is_ready(self) -> bool:
-        """Check if RAG system is ready"""
+        """Check if RAG system is ready by checking if the collection exists."""
         try:
-            collection = self.vector_store_service.load_collection(self.collection_name)
-            return collection is not None and collection.document_count > 0
-        except Exception:
+            logger.info(f"Checking if collection '{self.collection_name}' exists... result: {self.vector_store_service.collection_exists(self.collection_name)}")
+            return self.vector_store_service.collection_exists(self.collection_name)
+        except Exception as e:
+            logger.error(f"Error checking if RAG is ready: {e}", exc_info=True)
             return False
+
+    def cleanup(self):
+        """
+        Cleans up resources managed by the orchestrator's services.
+        This should be called during application shutdown.
+        """
+        logger.info("Cleaning up RAG Orchestrator resources...")
+        if self.vector_store_service:
+            self.vector_store_service.cleanup()

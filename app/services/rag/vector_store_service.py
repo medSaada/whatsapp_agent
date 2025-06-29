@@ -1,12 +1,11 @@
-from langchain.vectorstores import Chroma
-from langchain_community.embeddings import OpenAIEmbeddings
+from langchain_qdrant import Qdrant
+from qdrant_client import QdrantClient, models
+from langchain_openai import OpenAIEmbeddings
 from langchain_core.documents import Document
 from typing import List, Optional, Dict, Any, Tuple, FrozenSet
 from dataclasses import dataclass
 from pathlib import Path
-import os
 import logging
-import shutil
 from datetime import datetime
 
 # Configure logging
@@ -66,7 +65,6 @@ class SearchResult:
     
     def filter_by_score(self, min_score: float) -> 'SearchResult':
         """Return new SearchResult with filtered documents"""
-        # Note: This assumes documents have a score attribute
         filtered_docs = tuple(
             doc for doc in self.documents 
             if hasattr(doc, 'metadata') and doc.metadata.get('score', 0) >= min_score
@@ -98,19 +96,12 @@ class CollectionInfo:
             raise ValueError("Document count cannot be negative")
 
 class VectorStoreService:
-    """Vector store service with improved error handling and immutable results"""
+    """Vector store service using Qdrant with improved error handling."""
     
     def __init__(self, 
                  config: VectorStoreConfig,
                  embedding_model: Optional[OpenAIEmbeddings] = None):
-        """
-        Initialize vector store service
-        
-        Args:
-            config: Immutable configuration object
-            embedding_model: Optional embedding model (will create default if None)
-        """
-        # Fail Fast validation
+        """Initialize Qdrant vector store service"""
         if not isinstance(config, VectorStoreConfig):
             raise TypeError("config must be a VectorStoreConfig instance")
         
@@ -118,229 +109,135 @@ class VectorStoreService:
         self._embedding_model = embedding_model or OpenAIEmbeddings(
             model=config.embedding_model_name
         )
-        self._vector_stores: Dict[str, Chroma] = {}
-        self._collections_info: Dict[str, CollectionInfo] = {}
         
-        # Ensure store directory exists
         store_path = Path(config.store_path)
         store_path.mkdir(parents=True, exist_ok=True)
+        self._client = QdrantClient(path=str(store_path))
         
-        logger.info(f"VectorStoreService initialized with config: {config}")
+        self._vector_stores: Dict[str, Qdrant] = {}
+        self._collections_info: Dict[str, CollectionInfo] = {}
+        
+        logger.info(f"VectorStoreService (Qdrant) initialized at path: {config.store_path}")
     
     @property
     def config(self) -> VectorStoreConfig:
-        """Get immutable configuration"""
         return self._config
     
     @property
     def available_collections(self) -> FrozenSet[str]:
-        """Get available collection names"""
-        return frozenset(self._collections_info.keys())
+        return frozenset(c.name for c in self._client.get_collections().collections)
     
     def create_collection(self, 
                          collection_name: str,
                          documents: List[Document]) -> CollectionInfo:
         """
-        Create a new collection with documents
-        
-        Args:
-            collection_name: Name for the collection
-            documents: List of documents to add
-            
-        Returns:
-            Immutable CollectionInfo object
-            
-        Raises:
-            ValueError: If validation fails
-            RuntimeError: If creation fails
+        Creates a new Qdrant collection and indexes documents using the service's primary client.
+        This method avoids creating a new, conflicting client instance.
         """
-        # Fail Fast validation
-        if not collection_name or not collection_name.strip():
-            raise ValueError("Collection name cannot be empty")
-        
-        if not collection_name.replace('_', '').replace('-', '').isalnum():
-            raise ValueError("Collection name must contain only alphanumeric characters, hyphens, and underscores")
+        if self.collection_exists(collection_name):
+            raise ValueError(f"Collection '{collection_name}' already exists")
         
         if not documents:
             raise ValueError("Documents list cannot be empty")
         
-        if len(documents) > self._config.max_documents_per_collection:
-            raise ValueError(f"Too many documents. Max allowed: {self._config.max_documents_per_collection}")
-        
-        if collection_name in self._vector_stores:
-            raise ValueError(f"Collection '{collection_name}' already exists")
-        
-        # Validate document format
-        for i, doc in enumerate(documents):
-            if not isinstance(doc, Document):
-                raise TypeError(f"Document at index {i} is not a Document instance")
-            
-            if not hasattr(doc, 'page_content') or not doc.page_content.strip():
-                raise ValueError(f"Document at index {i} has empty content")
-        
-        logger.info(f"Creating collection '{collection_name}' with {len(documents)} documents")
+        logger.info(f"Creating and populating Qdrant collection '{collection_name}' with {len(documents)} documents")
         
         try:
-            # Create collection-specific path
-            collection_path = Path(self._config.store_path) / collection_name
-            collection_path.mkdir(exist_ok=True)
-            
-            # Create vector store
-            vector_store = Chroma.from_documents(
-                documents=documents,
-                embedding=self._embedding_model,
-                persist_directory=str(collection_path)
+            # Step 1: Determine vector size and explicitly create the collection
+            vector_size = len(self._embedding_model.embed_query("test"))
+            self._client.create_collection(
+                collection_name=collection_name,
+                vectors_config=models.VectorParams(size=vector_size, distance=models.Distance.COSINE)
             )
             
-            # Persist immediately
-            vector_store.persist()
-            
-            # Store references
+            # Step 2: Create the LangChain wrapper for the new collection
+            vector_store = Qdrant(
+                client=self._client,
+                collection_name=collection_name,
+                embeddings=self._embedding_model
+            )
+
+            # Step 3: Add documents to the now-existing collection
+            vector_store.add_documents(documents, wait=True)
             self._vector_stores[collection_name] = vector_store
             
-            # Create collection info
             now = datetime.now()
+            doc_count = self._client.count(collection_name=collection_name, exact=True).count
             collection_info = CollectionInfo(
                 name=collection_name,
-                document_count=len(documents),
+                document_count=doc_count,
                 created_at=now,
                 last_updated=now,
                 embedding_model=self._config.embedding_model_name
             )
-            
             self._collections_info[collection_name] = collection_info
             
-            logger.info(f"Collection '{collection_name}' created successfully")
+            logger.info(f"Collection '{collection_name}' created successfully in Qdrant")
             return collection_info
             
         except Exception as e:
-            logger.error(f"Error creating collection '{collection_name}': {e}")
-            # Cleanup on failure
-            collection_path = Path(self._config.store_path) / collection_name
-            if collection_path.exists():
-                shutil.rmtree(collection_path, ignore_errors=True)
-            raise RuntimeError(f"Failed to create collection '{collection_name}': {e}")
+            logger.error(f"Error creating Qdrant collection '{collection_name}': {e}", exc_info=True)
+            # Ensure cleanup on failure
+            if self.collection_exists(collection_name):
+                self._client.delete_collection(collection_name=collection_name)
+            raise RuntimeError(f"Failed to create Qdrant collection '{collection_name}': {e}")
     
     def load_collection(self, collection_name: str) -> Optional[CollectionInfo]:
-        """
-        Load an existing collection from disk
-        
-        Args:
-            collection_name: Name of collection to load
-            
-        Returns:
-            CollectionInfo if successful, None if not found
-        """
-        # Fail Fast validation
-        if not collection_name or not collection_name.strip():
-            raise ValueError("Collection name cannot be empty")
-        
-        collection_path = Path(self._config.store_path) / collection_name
-        
-        if not collection_path.exists():
-            logger.warning(f"Collection '{collection_name}' not found at {collection_path}")
+        """Loads an existing Qdrant collection from disk."""
+        if not self.collection_exists(collection_name):
+            logger.warning(f"Collection '{collection_name}' not found in Qdrant.")
             return None
         
+        if collection_name in self._vector_stores:
+            return self._collections_info.get(collection_name)
+
         try:
-            logger.info(f"Loading collection '{collection_name}'")
-            
-            # Load vector store
-            vector_store = Chroma(
-                persist_directory=str(collection_path),
-                embedding_function=self._embedding_model
+            logger.info(f"Loading collection '{collection_name}' from Qdrant")
+            vector_store = Qdrant(
+                client=self._client,
+                collection_name=collection_name,
+                embeddings=self._embedding_model,
             )
             
-            # Get document count
-            try:
-                doc_count = vector_store._collection.count()
-            except:
-                doc_count = 0
-            
-            # Store references
+            doc_count = self._client.count(collection_name=collection_name, exact=True).count
             self._vector_stores[collection_name] = vector_store
             
-            # Create collection info (we don't have creation date from disk)
             now = datetime.now()
             collection_info = CollectionInfo(
-                name=collection_name,
-                document_count=doc_count,
-                created_at=now,  # Approximation
-                last_updated=now,
-                embedding_model=self._config.embedding_model_name
+                name=collection_name, document_count=doc_count, created_at=now,
+                last_updated=now, embedding_model=self._config.embedding_model_name
             )
-            
             self._collections_info[collection_name] = collection_info
             
             logger.info(f"Collection '{collection_name}' loaded successfully with {doc_count} documents")
             return collection_info
             
         except Exception as e:
-            logger.error(f"Error loading collection '{collection_name}': {e}")
+            logger.error(f"Error loading Qdrant collection '{collection_name}': {e}", exc_info=True)
             return None
     
     def add_documents_to_collection(self, 
                                    collection_name: str,
                                    documents: List[Document]) -> CollectionInfo:
-        """
-        Add documents to existing collection
-        
-        Args:
-            collection_name: Name of existing collection
-            documents: Documents to add
-            
-        Returns:
-            Updated CollectionInfo
-        """
-        # Fail Fast validation
-        if not collection_name or not collection_name.strip():
-            raise ValueError("Collection name cannot be empty")
-        
-        if not documents:
-            raise ValueError("Documents list cannot be empty")
-        
-        if collection_name not in self._vector_stores:
+        """Add documents to an existing collection."""
+        if not self.load_collection(collection_name):
             raise ValueError(f"Collection '{collection_name}' does not exist. Create it first.")
         
-        # Check document limit
-        current_info = self._collections_info[collection_name]
-        total_docs = current_info.document_count + len(documents)
-        
-        if total_docs > self._config.max_documents_per_collection:
-            raise ValueError(f"Adding {len(documents)} documents would exceed limit of {self._config.max_documents_per_collection}")
-        
-        # Validate documents
-        for i, doc in enumerate(documents):
-            if not isinstance(doc, Document):
-                raise TypeError(f"Document at index {i} is not a Document instance")
-            
-            if not hasattr(doc, 'page_content') or not doc.page_content.strip():
-                raise ValueError(f"Document at index {i} has empty content")
-        
-        logger.info(f"Adding {len(documents)} documents to collection '{collection_name}'")
+        vector_store = self._vector_stores[collection_name]
         
         try:
-            vector_store = self._vector_stores[collection_name]
+            vector_store.add_documents(documents, wait=True)
             
-            # Add documents
-            vector_store.add_documents(documents)
-            vector_store.persist()
-            
-            # Update collection info
+            current_info = self._collections_info[collection_name]
+            new_doc_count = self._client.count(collection_name=collection_name, exact=True).count
             updated_info = CollectionInfo(
-                name=collection_name,
-                document_count=total_docs,
-                created_at=current_info.created_at,
-                last_updated=datetime.now(),
-                embedding_model=current_info.embedding_model
+                name=collection_name, document_count=new_doc_count, created_at=current_info.created_at,
+                last_updated=datetime.now(), embedding_model=current_info.embedding_model
             )
-            
             self._collections_info[collection_name] = updated_info
-            
-            logger.info(f"Successfully added {len(documents)} documents to '{collection_name}'")
             return updated_info
-            
         except Exception as e:
-            logger.error(f"Error adding documents to collection '{collection_name}': {e}")
+            logger.error(f"Error adding documents to collection '{collection_name}': {e}", exc_info=True)
             raise RuntimeError(f"Failed to add documents: {e}")
     
     def search_collection(self, 
@@ -348,163 +245,91 @@ class VectorStoreService:
                          query: str,
                          k: int = 5,
                          filter_dict: Optional[Dict[str, Any]] = None) -> SearchResult:
-        """
-        Search in a specific collection
+        """Search in a specific collection, converting dict filter to Qdrant filter."""
+        if not self.load_collection(collection_name):
+            raise ValueError(f"Collection '{collection_name}' does not exist.")
         
-        Args:
-            collection_name: Name of collection to search
-            query: Search query
-            k: Number of results to return
-            filter_dict: Optional metadata filter
-            
-        Returns:
-            Immutable SearchResult object
-        """
-        # Fail Fast validation
-        if not collection_name or not collection_name.strip():
-            raise ValueError("Collection name cannot be empty")
-        
-        if not query or not query.strip():
-            raise ValueError("Query cannot be empty")
-        
-        if k <= 0:
-            raise ValueError("k must be positive")
-        
-        if k > 100:
-            raise ValueError("k cannot exceed 100")
-        
-        if collection_name not in self._vector_stores:
-            raise ValueError(f"Collection '{collection_name}' does not exist")
-        
-        logger.info(f"Searching collection '{collection_name}' for: '{query}' (k={k})")
+        vector_store = self._vector_stores[collection_name]
         
         try:
-            vector_store = self._vector_stores[collection_name]
+            qdrant_filter = self._create_qdrant_filter(filter_dict)
+            
             search_start = datetime.now()
+            results = vector_store.similarity_search(query=query, k=k, filter=qdrant_filter)
             
-            # Perform search
-            results = vector_store.similarity_search(
-                query=query.strip(),
-                k=k,
-                filter=filter_dict
+            return SearchResult(
+                documents=tuple(results), query=query, collection_name=collection_name,
+                search_time=search_start, total_results=len(results)
             )
-            
-            # Create immutable result
-            search_result = SearchResult(
-                documents=tuple(results),
-                query=query.strip(),
-                collection_name=collection_name,
-                search_time=search_start,
-                total_results=len(results)
-            )
-            
-            logger.info(f"Search completed. Found {len(results)} results")
-            return search_result
-            
         except Exception as e:
-            logger.error(f"Error searching collection '{collection_name}': {e}")
+            logger.error(f"Error searching collection '{collection_name}': {e}", exc_info=True)
             raise RuntimeError(f"Search failed: {e}")
+
+    def _create_qdrant_filter(self, filter_dict: Optional[Dict[str, Any]]) -> Optional[models.Filter]:
+        if not filter_dict:
+            return None
+        return models.Filter(
+            must=[
+                models.FieldCondition(key=f"metadata.{key}", match=models.MatchValue(value=value))
+                for key, value in filter_dict.items()
+            ]
+        )
     
     def get_collection_info(self, collection_name: str) -> Optional[CollectionInfo]:
-        """
-        Get information about a collection
-        
-        Args:
-            collection_name: Name of collection
-            
-        Returns:
-            CollectionInfo if exists, None otherwise
-        """
-        if not collection_name or not collection_name.strip():
-            raise ValueError("Collection name cannot be empty")
-        
-        return self._collections_info.get(collection_name)
+        if not self.collection_exists(collection_name):
+            return None
+        return self.load_collection(collection_name)
     
     def list_collections(self) -> Tuple[CollectionInfo, ...]:
-        """
-        List all available collections
-        
-        Returns:
-            Tuple of CollectionInfo objects
-        """
-        return tuple(self._collections_info.values())
+        return tuple(info for info in (self.get_collection_info(c.name) for c in self._client.get_collections().collections) if info)
     
     def delete_collection(self, collection_name: str) -> bool:
-        """
-        Delete a collection and all its data
-        
-        Args:
-            collection_name: Name of collection to delete
-            
-        Returns:
-            True if successful, False otherwise
-        """
-        # Fail Fast validation
-        if not collection_name or not collection_name.strip():
-            raise ValueError("Collection name cannot be empty")
-        
-        if collection_name not in self._vector_stores:
-            logger.warning(f"Collection '{collection_name}' does not exist")
+        """Delete a collection and all its data."""
+        if not self.collection_exists(collection_name):
+            logger.warning(f"Attempted to delete non-existent collection '{collection_name}'")
             return False
         
-        logger.info(f"Deleting collection '{collection_name}'")
-        
         try:
-            # Remove from memory
-            del self._vector_stores[collection_name]
-            del self._collections_info[collection_name]
-            
-            # Remove from disk
-            collection_path = Path(self._config.store_path) / collection_name
-            if collection_path.exists():
-                shutil.rmtree(collection_path)
-            
-            logger.info(f"Collection '{collection_name}' deleted successfully")
-            return True
-            
+            result = self._client.delete_collection(collection_name=collection_name)
+            if result:
+                self._vector_stores.pop(collection_name, None)
+                self._collections_info.pop(collection_name, None)
+            return result
         except Exception as e:
-            logger.error(f"Error deleting collection '{collection_name}': {e}")
+            logger.error(f"Error deleting collection '{collection_name}': {e}", exc_info=True)
             return False
     
     def get_service_stats(self) -> Dict[str, Any]:
-        """
-        Get service statistics
-        
-        Returns:
-            Dictionary with service statistics
-        """
-        total_documents = sum(info.document_count for info in self._collections_info.values())
-        
+        collections = self.list_collections()
         return {
-            "total_collections": len(self._collections_info),
-            "total_documents": total_documents,
+            "total_collections": len(collections),
+            "total_documents": sum(c.document_count for c in collections),
             "embedding_model": self._config.embedding_model_name,
             "store_path": self._config.store_path,
-            "collections": [
-                {
-                    "name": info.name,
-                    "document_count": info.document_count,
-                    "created_at": info.created_at.isoformat(),
-                    "last_updated": info.last_updated.isoformat()
-                }
-                for info in self._collections_info.values()
-            ]
+            "collections": [{"name": c.name, "document_count": c.document_count} for c in collections]
         }
     
     def cleanup(self):
-        """Clean up resources"""
-        for name, store in self._vector_stores.items():
-            try:
-                store.persist()
-                # Close Chroma client
-                if name in self._chroma_clients:
-                    self._chroma_clients[name].reset()  # Reset client
-                    del self._chroma_clients[name]
-            except Exception as e:
-                logger.warning(f"Cleanup warning for {name}: {e}")
-        
+        """Clean up resources."""
+        self._client.close()
         self._vector_stores.clear()
         self._collections_info.clear()
+        logger.info("VectorStoreService (Qdrant) resources cleaned up.")
+
+    def collection_exists(self, collection_name: str) -> bool:
+        """Check if a collection exists in Qdrant."""
+        return collection_name in {c.name for c in self._client.get_collections().collections}
         
-        logger.info("VectorStoreService cleanup completed")
+    def as_retriever(self, collection_name: str, **kwargs) -> 'VectorStoreRetriever':
+        """Returns a LangChain retriever for a specific Qdrant collection."""
+        if not self.load_collection(collection_name):
+            raise ValueError(f"Collection '{collection_name}' does not exist or could not be loaded.")
+        
+        vector_store = self._vector_stores[collection_name]
+        
+        if 'search_kwargs' in kwargs and 'filter' in kwargs['search_kwargs']:
+            filter_dict = kwargs['search_kwargs'].get('filter')
+            kwargs['search_kwargs']['filter'] = self._create_qdrant_filter(filter_dict)
+
+        return vector_store.as_retriever(**kwargs)
 

@@ -3,13 +3,13 @@ from langchain_openai import ChatOpenAI
 from langchain_core.documents import Document
 from typing import List, Optional
 import logging
-
+from app.core.prompt import QNA_TEMPLATE_RAG
+from langchain.prompts import ChatPromptTemplate, MessagesPlaceholder
 logger = logging.getLogger(__name__)
 
 """
 Responsibilities:
 LLM model management
-Prompt engineering
 Response generation
 Answer quality control
 
@@ -46,21 +46,34 @@ class GenerationService:
         
         logger.info(f"GenerationService initialized with model: {model_name}")
     
+    def get_agent_runnable(self, tools: List) -> 'Runnable':
+        """
+        Creates and returns a LangChain runnable that binds the LLM with 
+        the system prompt and the necessary tools for the agent.
+        """
+        # Bind the tools to the LLM
+        llm_with_tools = self.llm.bind_tools(tools)
+        
+        # Adapt the RAG prompt to a system prompt for the agent
+        system_prompt_str = self.prompt_template.replace(
+            "{context}", 
+            "Use the documents from the 'knowledge_base_retriever' tool to answer the user's question."
+        ).replace("{question}", "")
+
+        # Create the agent's prompt structure
+        agent_prompt = ChatPromptTemplate.from_messages([
+            ("system", system_prompt_str),
+            MessagesPlaceholder(variable_name="messages")
+        ])
+        
+        # Return the complete runnable chain
+        return agent_prompt | llm_with_tools
+    
     def _get_default_prompt(self) -> str:
         """Get default RAG prompt template"""
-        return """"You are **Fatima-Zahra**, a **client support expert** at **Geniats**, an **e-learning coding academy** for **Moroccan kids aged 6–15",
-     "Your job is to **respond to client messages in Moroccan Darija** (or French, indeed the same language used by the client), with the goal of **convincing them to join and purchase our offers",
-     "Behave like a respectful professional sales girl that her ultimate goal is to convert the lead into a client targeting the lead pain points",
-     "Keep answers short and concise, and always end with a question to keep the conversation going",
-      "### Context:",
-    "{context}",
-    "",
-    "### Question:",
-    "{question}",
-    "",
-    "### Answer:"
-    """
+        return PROMPT_TELECOM_RAG
     
+
     def generate_response(self, 
                          question: str, 
                          context: str,
