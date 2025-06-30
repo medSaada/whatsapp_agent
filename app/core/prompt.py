@@ -44,7 +44,7 @@ PLANNER_PROMPT = """You are an expert planner. Your job is to analyze the user's
 Based on the user's message, you must decide to either:
 
 1.  **Call a tool**: If the user is asking a specific question about Geniats, its programs, pricing, curriculum, or requires any specific knowledge, choose the `knowledge_base_retriever` tool.
-2.  **Respond to the user**: If the user is just making small talk (e.g., "hello", "thanks"), or if you have already used the tool and now have the context to answer, decide to respond. You will not generate the response yourself; you will simply signal that it's time for the generator to take over.
+2.   If the user is just making small talk (e.g., "hello", "thanks"), or if you have already used the tool and now have the context to answer, decide to respond. You will not generate the response yourself; you will simply signal that it's time for the generator to take over.
 
 The conversation history will be provided. Focus on the most recent user message to make your decision.
 """
