@@ -48,7 +48,7 @@ class WhatsAppService:
     
     def _generate_rag_response(self, sender_id: str, user_message: str) -> str:
         """
-        Generates an intelligent response using the stateful RAG agent.
+        Generates an intelligent response using the stateful RAG agent with langgraph.
         The sender_id is used to maintain conversation history.
         """
         try:
@@ -71,7 +71,8 @@ class WhatsAppService:
         except Exception as e:
             logger.error(f"Error generating RAG response for conversation '{sender_id}': {e}", exc_info=True)
             return self._get_fallback_response(user_message)
-    
+   
+    # Not used anymore
     def _get_fallback_response(self, user_message: str) -> str:
         """
         Get fallback response when RAG is not available

@@ -4,24 +4,24 @@ from langchain_core.messages import BaseMessage
 
 class AgentState(TypedDict):
     """
-    Represents the state of our graph.
-    This structure is passed between nodes and updated at each step.
-    It holds the history of messages in the conversation.
+    Represents the state of our agent.
+
+    Attributes:
+        messages: The history of messages in the conversation.
+                  The `operator.add` anntation tells LangGraph to append new messages
+                  to this list rather than overwriting it.
+        context: The retrieved context from the vector store.
     """
     messages: Annotated[List[BaseMessage], operator.add]
+    context: str
 
 def should_continue(state: AgentState) -> str:
     """
-    Determines the next step in the graph.
+    Determines the next step for the agent.
 
-    If the last message in the state contains tool calls, it directs the graph
-    to execute the 'call_tool' node. Otherwise, it signifies that the agent's
-    turn is complete, and the graph should 'end'.
+    If the last message is a tool call, it routes to the tool executor.
+    Otherwise, it ends the conversation.
     """
-    last_message = state['messages'][-1]
-    if last_message.tool_calls:
-        # The agent has decided to use a tool
+    if "tool_calls" in state["messages"][-1].additional_kwargs:
         return "call_tool"
-    else:
-        # The agent has responded directly and the turn is over
-        return "end" 
+    return "end" 

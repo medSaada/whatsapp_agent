@@ -1,6 +1,11 @@
-from langchain_core.tools import BaseTool, create_retriever_tool
+from langchain_core.tools import BaseTool, Tool
+from pydantic.v1 import BaseModel, Field
 
 from app.services.rag.vector_store_service import VectorStoreService
+
+class RetrieverInput(BaseModel):
+    """Input schema for the retriever tool."""
+    query: str = Field(description="The query to search for in the knowledge base.")
 
 def create_rag_tool(vector_store_service: VectorStoreService, collection_name: str) -> BaseTool:
     """
@@ -12,17 +17,12 @@ def create_rag_tool(vector_store_service: VectorStoreService, collection_name: s
     """
     retriever = vector_store_service.as_retriever(
         collection_name=collection_name,
-        search_kwargs={
-            "k": 5,
-            # This filter can be parameterized if needed
-           #"filter": {"source": "H:\\projects\\pojects_codes\\Personal_Projects\\whatsapp_agent_poc\\data\\documents\\datagenerated_assistant.txt"
-           }
-        
+        search_kwargs={"k": 5}
     )
     
-    retriever_tool = create_retriever_tool(
-        retriever,
-        "knowledge_base_retriever",
-        "Searches and returns relevant information from the knowledge base to answer user questions.",
-    )
-    return retriever_tool 
+    return Tool(
+        name="knowledge_base_retriever",
+        description="This is your primary tool. You **MUST** use it to search the Geniats knowledge base for specific details about the e-learning programs, pricing, and curriculum to answer client questions. Use this to find the exact information you need before responding.",
+        func=retriever.invoke,
+        args_schema=RetrieverInput,
+    ) 
