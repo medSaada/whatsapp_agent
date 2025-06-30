@@ -4,7 +4,7 @@ import sqlite3
 from pathlib import Path
 from langchain_core.tools import BaseTool
 from typing import List
-from langchain_core.messages import ToolMessage, AIMessage
+from langchain_core.messages import ToolMessage, AIMessage, SystemMessage
 import logging
 
 from app.services.rag.generation_service import GenerationService
@@ -35,15 +35,97 @@ class GraphBuilder:
     Builds the stateful LangGraph agent with separate planner and generator nodes.
     """
 
-    def __init__(self, generation_service: GenerationService, tools: List[BaseTool]):
+    def __init__(self, generation_service: GenerationService, tools: List[BaseTool], memory_threshold: int = 6):
         self.generation_service = generation_service
         self.tools = tools
+        self.memory_threshold = memory_threshold
+
+    def _check_memory_threshold(self, state: AgentState) -> AgentState:
+        """
+        Check if memory threshold is reached and handle summarization if needed.
+        Returns the updated state.
+        """
+        current_count = state.get("interaction_count", 0)
+        new_count = current_count + 1
+        
+        logger.info(f"[Memory Management] Interaction count: {current_count} -> {new_count} (threshold: {self.memory_threshold})")
+        
+        # Check if we need to summarize and wipe memory
+        if current_count >= self.memory_threshold and len(state["messages"]) > 2:  # More than just system messages
+            logger.info(f"[Memory Management] 🧹 THRESHOLD REACHED! Summarizing and wiping conversation history...")
+            logger.info(f"[Memory Management] Messages to summarize: {len(state['messages'])}")
+            
+            try:
+                # Get conversation history for summarization
+                conversation_messages = [msg for msg in state["messages"] if not isinstance(msg, SystemMessage)]
+                
+                if conversation_messages:
+                    logger.info(f"[Memory Management] Found {len(conversation_messages)} conversation messages to summarize")
+                    
+                    # Create a text representation of the conversation
+                    conversation_text = "\n".join([
+                        f"{'User' if hasattr(msg, 'type') and msg.type == 'human' else 'Assistant'}: {msg.content}"
+                        for msg in conversation_messages
+                    ])
+                    
+                    # Generate summary
+                    summarizer_chain = self.generation_service.get_summarizer_chain()
+                    summary = summarizer_chain.invoke({"history": conversation_text})
+                    
+                    logger.info(f"[Memory Management] 📝 SUMMARY CREATED: {summary}")
+                    logger.info(f"[Memory Management] ✅ Memory wiped and reset. Starting fresh with summary.")
+                    
+                    # Create new state with summary as system message and reset messages
+                    summary_message = SystemMessage(content=f"Previous conversation summary: {summary}")
+                    
+                    return {
+                        "messages": [summary_message],
+                        "context": state.get("context", ""),
+                        "interaction_count": 1  # Reset counter
+                    }
+                else:
+                    logger.warning("[Memory Management] No conversation messages to summarize")
+                    return {
+                        "messages": state["messages"],
+                        "context": state.get("context", ""),
+                        "interaction_count": new_count
+                    }
+                    
+            except Exception as e:
+                logger.error(f"[Memory Management] Error during summarization: {e}", exc_info=True)
+                # If summarization fails, just reset the counter and continue
+                return {
+                    "messages": state["messages"],
+                    "context": state.get("context", ""),
+                    "interaction_count": new_count
+                }
+        else:
+            # No threshold reached, just increment counter
+            if current_count == 0:
+                logger.info(f"[Memory Management] First interaction. Counter: {new_count}")
+            else:
+                logger.info(f"[Memory Management] Continuing conversation. Counter: {new_count}/{self.memory_threshold}")
+            
+            return {
+                "messages": state["messages"],
+                "context": state.get("context", ""),
+                "interaction_count": new_count
+            }
 
     def _planner_node(self, state: AgentState):
         """The 'brain' of the agent. Decides the next action."""
+        # Ensure state has all required keys
+        if "context" not in state:
+            state["context"] = ""
+        if "interaction_count" not in state:
+            state["interaction_count"] = 0
+            
+        # Check memory threshold before processing
+        updated_state = self._check_memory_threshold(state)
+        
         planner_chain = self.generation_service.get_planner_chain(self.tools)
-        response = planner_chain.invoke({"messages": state['messages']})
-        return {"messages": [response]}
+        response = planner_chain.invoke({"messages": updated_state['messages']})
+        return {"messages": [response], "interaction_count": updated_state["interaction_count"]}
 
     def _generator_node(self, state: AgentState):
         """The 'voice' of the agent. Generates the final response."""
@@ -56,7 +138,7 @@ class GraphBuilder:
             "messages": state['messages'],
             "context": context
         })
-        return {"messages": [response]}
+        return {"messages": [response], "interaction_count": state.get("interaction_count", 0)}
 
     def build(self, db_path: str):
         """

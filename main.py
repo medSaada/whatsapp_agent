@@ -24,7 +24,8 @@ async def lifespan(app: FastAPI):
         vector_store_path="data/vector_store",
         collection_name="production_collection",
         model_name="gpt-4.1",
-        temperature=0.2
+        temperature=0.2,
+        memory_threshold=6  # Summarize and wipe memory every 6 interactions
     )
     yield
     # Cleanup, like closing database connections, can happen here after `yield`

@@ -1,11 +1,14 @@
 from typing import List, Optional, Dict, Any
 from langchain_core.documents import Document
-from langchain_core.messages import HumanMessage, ToolMessage
+from langchain_core.messages import HumanMessage, ToolMessage, SystemMessage
 from langchain_core.prompts import BasePromptTemplate
 from langchain_community.embeddings import OpenAIEmbeddings
 from langchain_openai import ChatOpenAI
 import logging
 from pathlib import Path
+from langchain.globals import set_debug
+from langgraph.checkpoint.sqlite import SqliteSaver
+import sqlite3
 
 from app.services.rag.vector_store_service import VectorStoreService, VectorStoreConfig
 from app.services.rag.generation_service import GenerationService
@@ -13,6 +16,9 @@ from app.services.rag.graph.builder import GraphBuilder
 from app.services.rag.graph.tools import create_rag_tool
 
 logger = logging.getLogger(__name__)
+
+# Enable for deep debugging of LangGraph execution
+# set_debug(True)
 
 # Note: No specific prompt is needed here anymore, as the GenerationService
 # is self-contained.
@@ -30,7 +36,8 @@ class RAGOrchestrator:
                  collection_name: str = "production_collection",
                  model_name: str = "gpt-4.1",
                  temperature: float = 0.2,
-                 db_path: str = "data/sqlite/conversation_memory.db"):
+                 db_path: str = "data/sqlite/conversation_memory.db",
+                 memory_threshold: int = 6):
         """
         Initialize the RAG Orchestrator services.
         The agent graph is not built here, but on-demand.
@@ -38,6 +45,7 @@ class RAGOrchestrator:
         self.collection_name = collection_name
         self.db_path = db_path
         self._graph = None # The graph will be built lazily
+        self.memory_threshold = memory_threshold
         
         # 1. Initialize core services
         llm = ChatOpenAI(model=model_name, temperature=temperature)
@@ -45,6 +53,7 @@ class RAGOrchestrator:
         self.generation_service = self._init_generation_service(llm)
         
         logger.info(f"RAG Orchestrator initialized for collection: {collection_name}")
+        logger.info(f"[Memory Management] Memory threshold set to: {self.memory_threshold} interactions")
     
     def _get_or_build_graph(self):
         """
@@ -63,7 +72,7 @@ class RAGOrchestrator:
         
         logger.info("Building LangGraph agent...")
         rag_tool = create_rag_tool(self.vector_store_service, self.collection_name)
-        builder = GraphBuilder(self.generation_service, [rag_tool])
+        builder = GraphBuilder(self.generation_service, [rag_tool], memory_threshold=self.memory_threshold)
         self._graph = builder.build(self.db_path)
         logger.info("LangGraph agent built successfully.")
         
@@ -91,9 +100,14 @@ class RAGOrchestrator:
 
         try:
             config = {"configurable": {"thread_id": conversation_id}}
-            input_data = {"messages": [HumanMessage(content=question)]}
+            input_data = {
+                "messages": [HumanMessage(content=question)],
+                "context": "",
+                "interaction_count": 0
+            }
             
             logger.info(f"--- Starting new RAG flow for conversation '{conversation_id}' ---")
+            logger.info(f"[Memory Management] Processing interaction for conversation: {conversation_id}")
             
             # Invoke the graph and wait for the final state. This is more robust
             # than streaming and trying to interpret intermediate steps.
@@ -101,6 +115,10 @@ class RAGOrchestrator:
             
             # The final response is the last message in the list.
             final_response = final_state["messages"][-1].content
+            
+            # Log the current interaction count
+            interaction_count = final_state.get("interaction_count", 0)
+            logger.info(f"[Memory Management] Current interaction count for '{conversation_id}': {interaction_count}")
             
             # Determine if tools were used by inspecting the message history
             tool_used = any(isinstance(msg, ToolMessage) for msg in final_state["messages"])

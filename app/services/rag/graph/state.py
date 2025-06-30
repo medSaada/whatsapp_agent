@@ -11,9 +11,11 @@ class AgentState(TypedDict):
                   The `operator.add` anntation tells LangGraph to append new messages
                   to this list rather than overwriting it.
         context: The retrieved context from the vector store.
+        interaction_count: Counter for tracking the number of interactions for memory management.
     """
     messages: Annotated[List[BaseMessage], operator.add]
     context: str
+    interaction_count: int
 
 def should_continue(state: AgentState) -> str:
     """
