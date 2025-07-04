@@ -11,13 +11,12 @@ class Settings(BaseSettings):
     META_PHONE_NUMBER_ID: str
     OPENAI_API_KEY: str
     HF_TOKEN: str
-    LANGSMITH_API_KEY: str
     COHERE_API_KEY: str
-    LANGSMITH_TRACING: bool
+    LANGSMITH_TRACING: str
     LANGSMITH_ENDPOINT: str
     LANGSMITH_API_KEY: str
     LANGSMITH_PROJECT: str
-
+    LANGCHAIN_TRACING_V2: str
     # Application Settings
     APP_HOST: str = "0.0.0.0"
     APP_PORT: int = 8000

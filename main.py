@@ -1,17 +1,14 @@
 import os
 import sys
-from contextlib import asynccontextmanager
-from fastapi import FastAPI
-
-# Add project root to Python path
+from app.core.config import get_settings
+settings = get_settings()
 project_root = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, project_root)
-
+from contextlib import asynccontextmanager
+from fastapi import FastAPI
 from app.api.v1.api import api_router
-from app.core.config import get_settings
 from app.services.rag.orchestrator import RAGOrchestrator
-
-settings = get_settings()
+import os
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -46,4 +43,9 @@ def read_root():
 
 if __name__ == "__main__":
     import uvicorn
+    # print(settings.LANGSMITH_PROJECT)
+    # from langsmith import Client
+    # client = Client()
+    # url = next(client.list_runs(project_name="whatsapp-agent-project")).url
+    # print(url)
     uvicorn.run(app, host=settings.APP_HOST, port=settings.APP_PORT)

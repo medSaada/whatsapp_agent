@@ -6,11 +6,12 @@ from langchain_core.tools import BaseTool
 from typing import List
 from langchain_core.messages import ToolMessage, AIMessage, SystemMessage
 import logging
-
+from langsmith import tracing_context,Client
 from app.services.rag.generation_service import GenerationService
 from app.services.rag.graph.state import AgentState
 from langgraph.checkpoint.sqlite import SqliteSaver
-
+from app.core.config import get_settings
+settings = get_settings()
 logger = logging.getLogger(__name__)
 
 
@@ -127,6 +128,7 @@ class GraphBuilder:
         response = planner_chain.invoke({"messages": updated_state['messages']})
         return {"messages": [response], "interaction_count": 1}
 
+ 
     def _generator_node(self, state: AgentState):
         """The 'voice' of the agent. Generates the final response."""
         # The context is now the content of the last message (the tool output)
