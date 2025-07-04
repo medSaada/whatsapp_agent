@@ -24,10 +24,11 @@ def should_continue(state: AgentState):
     """
     last_message = state["messages"][-1]
     if isinstance(last_message, AIMessage) and last_message.tool_calls:
+        logger.info(f"Tool call detected. Routing to tool executor.")
         return "call_tool"
-    if isinstance(last_message, ToolMessage):
+    else:
+        logger.info(f"No tool call detected. Routing to generator.")
         return "generate"
-    return "end"
 
 
 class GraphBuilder:
@@ -45,7 +46,8 @@ class GraphBuilder:
         Check if memory threshold is reached and handle summarization if needed.
         Returns the updated state.
         """
-        current_count = state.get("interaction_count", 0)
+        current_count = state.get("interaction_count")
+        logger.info(f"Hona counts ::☝🏿️☝🏿️☝🏿️☝🏿️☝🏿️☝🏿️☝🏿️☝🏿️☝🏿️☝🏿️☝🏿️☝🏿️☝🏿️☝🏿️☝🏿️☝🏿️☝🏿️☝🏿️☝🏿️☝🏿️☝🏿️☝🏿️☝🏿️☝🏿️☝🏿️☝🏿️☝🏿️☝🏿️☝🏿️☝🏿️: {current_count}")
         new_count = current_count + 1
         
         logger.info(f"[Memory Management] Interaction count: {current_count} -> {new_count} (threshold: {self.memory_threshold})")
@@ -88,7 +90,7 @@ class GraphBuilder:
                     return {
                         "messages": state["messages"],
                         "context": state.get("context", ""),
-                        "interaction_count": new_count
+                        "interaction_count": 1
                     }
                     
             except Exception as e:
@@ -97,7 +99,7 @@ class GraphBuilder:
                 return {
                     "messages": state["messages"],
                     "context": state.get("context", ""),
-                    "interaction_count": new_count
+                    "interaction_count": 1
                 }
         else:
             # No threshold reached, just increment counter
@@ -109,7 +111,7 @@ class GraphBuilder:
             return {
                 "messages": state["messages"],
                 "context": state.get("context", ""),
-                "interaction_count": new_count
+                "interaction_count": 1
             }
 
     def _planner_node(self, state: AgentState):
@@ -117,28 +119,26 @@ class GraphBuilder:
         # Ensure state has all required keys
         if "context" not in state:
             state["context"] = ""
-        if "interaction_count" not in state:
-            state["interaction_count"] = 0
             
         # Check memory threshold before processing
         updated_state = self._check_memory_threshold(state)
         
         planner_chain = self.generation_service.get_planner_chain(self.tools)
         response = planner_chain.invoke({"messages": updated_state['messages']})
-        return {"messages": [response], "interaction_count": updated_state["interaction_count"]}
+        return {"messages": [response], "interaction_count": 1}
 
     def _generator_node(self, state: AgentState):
         """The 'voice' of the agent. Generates the final response."""
         # The context is now the content of the last message (the tool output)
         context = state["messages"][-1].content
-        logger.info(f"Generator received context: {context[:200]}...")
+        #logger.info(f"Generator received context: {context[:200]}...")
 
         generator_chain = self.generation_service.get_generator_chain()
         response = generator_chain.invoke({
             "messages": state['messages'],
             "context": context
         })
-        return {"messages": [response], "interaction_count": state.get("interaction_count", 0)}
+        return {"messages": [response]}
 
     def build(self, db_path: str):
         """
@@ -160,7 +160,6 @@ class GraphBuilder:
             {
                 "call_tool": "call_tool",
                 "generate": "generator",
-                "end": END,
             }
         )
         

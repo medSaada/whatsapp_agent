@@ -13,7 +13,10 @@ class Settings(BaseSettings):
     HF_TOKEN: str
     LANGSMITH_API_KEY: str
     COHERE_API_KEY: str
-
+    LANGSMITH_TRACING: bool
+    LANGSMITH_ENDPOINT: str
+    LANGSMITH_API_KEY: str
+    LANGSMITH_PROJECT: str
 
     # Application Settings
     APP_HOST: str = "0.0.0.0"

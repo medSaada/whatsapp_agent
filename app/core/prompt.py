@@ -1,8 +1,6 @@
 from langchain_core.prompts import ChatPromptTemplate
 
-# 1. The Persona Prompt ("The Who")
-# Defines the AI's character, rules, and goals. This is the primary component
-# to modify for personality and behavior changes.
+
 PERSONA_PROMPT =  """
 
     "- Talk in the same language as the client if a user speaks in French you speak only in French and if the user speaks in Darija you speak only in Darija", 
@@ -37,8 +35,6 @@ PERSONA_PROMPT =  """
     # Conversation placeholders
 """
 
-# 2. The Planner Instruction Prompt ("The Brain")
-# This gives the agent its core reasoning instructions to choose a path.
 
 PLANNER_PROMPT = """You are an expert planner. Your job is to analyze the user's request and the conversation history to decide the best course of action.
 Based on the user's message, you must decide to either:

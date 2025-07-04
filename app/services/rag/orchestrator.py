@@ -115,9 +115,10 @@ class RAGOrchestrator:
             
             # The final response is the last message in the list.
             final_response = final_state["messages"][-1].content
+            #logger.info(f"Final response: {final_state['messages']}")
             
             # Log the current interaction count
-            interaction_count = final_state.get("interaction_count", 0)
+            interaction_count = final_state.get("interaction_count")
             logger.info(f"[Memory Management] Current interaction count for '{conversation_id}': {interaction_count}")
             
             # Determine if tools were used by inspecting the message history

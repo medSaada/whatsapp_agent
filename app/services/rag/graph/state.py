@@ -15,7 +15,7 @@ class AgentState(TypedDict):
     """
     messages: Annotated[List[BaseMessage], operator.add]
     context: str
-    interaction_count: int
+    interaction_count: Annotated[int, operator.add]
 
 def should_continue(state: AgentState) -> str:
     """
