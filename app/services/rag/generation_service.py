@@ -2,11 +2,11 @@ from langchain_core.prompts import ChatPromptTemplate
 from langchain_openai import ChatOpenAI
 from langchain_core.documents import Document
 from typing import List, Optional
-import logging
+from app.core.logging import get_logger
 from langchain_core.output_parsers import JsonOutputParser
 from app.core.prompt import PLANNER_SYSTEM_PROMPT, GENERATOR_SYSTEM_PROMPT, SUMMARIZER_PROMPT
 from langchain.prompts import ChatPromptTemplate, MessagesPlaceholder
-logger = logging.getLogger(__name__)
+logger = get_logger()
 
 """
 Responsibilities:

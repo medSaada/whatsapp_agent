@@ -1,5 +1,8 @@
 import os
 from pydantic_settings import BaseSettings
+from app.core.logging import get_logger
+
+logger = get_logger()
 
 class Settings(BaseSettings):
     """
@@ -37,6 +40,30 @@ class Settings(BaseSettings):
     def DOCUMENT_PATHS(self) -> list[str]:
         """Get list of document paths for RAG"""
         return [self.DOCUMENT_PATH_1, self.DOCUMENT_PATH_2]
+    
+    def ensure_langsmith_env_vars(self) -> None:
+        """
+        Ensure LangSmith environment variables are available in os.environ.
+        
+        LangSmith libraries expect these variables to be in os.environ, not just in our settings.
+        This method bridges our centralized settings approach with LangSmith's expectations.
+        
+        This is called once during application startup to ensure compatibility.
+        """
+        langsmith_vars = {
+            "LANGCHAIN_TRACING_V2": self.LANGCHAIN_TRACING_V2,
+            "LANGSMITH_API_KEY": self.LANGSMITH_API_KEY,
+            "LANGSMITH_PROJECT": self.LANGSMITH_PROJECT,
+            "LANGSMITH_ENDPOINT": self.LANGSMITH_ENDPOINT,
+        }
+        
+        for var_name, var_value in langsmith_vars.items():
+            if var_value:  # Only set if value exists
+                os.environ[var_name] = var_value
+                
+        # Optional: Log which variables were set (for debugging)
+        if langsmith_vars:
+            logger.info(f"LangSmith environment variables set: {', '.join(langsmith_vars.keys())}")
     
     class Config:     
         env_file = ".env"

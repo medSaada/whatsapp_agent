@@ -1,17 +1,43 @@
 import os
 import sys
 from app.core.config import get_settings
+from app.core.logging import get_logger
 
 # Get settings once at the application level
 settings = get_settings()
 
-project_root = os.path.dirname(os.path.abspath(__file__))
-sys.path.insert(0, project_root)
+logger = get_logger()
+
+settings.ensure_langsmith_env_vars()
+
 from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from app.api.v1.api import api_router
 from app.services.rag.orchestrator import RAGOrchestrator
 import os
+
+# LangSmith imports and setup (now safe because env vars are set)
+try:
+    from langsmith import tracing_context, Client
+    
+    
+    langsmith_client = Client()
+    print(f"✅ LangSmith connected successfully to project: {settings.LANGSMITH_PROJECT}")
+    
+    # Optional: Get project URL for debugging
+    try:
+        runs = list(langsmith_client.list_runs(project_name=settings.LANGSMITH_PROJECT, limit=1))
+        if runs:
+            print(f" Latest run URL: {runs[0].url}")
+        else:
+            print("No runs found yet - this will be the first!")
+    except Exception as url_error:
+        print(f"ould not fetch run URL (this is normal for new projects): {url_error}")
+        
+except Exception as langsmith_error:
+    print(f"LangSmith initialization failed: {langsmith_error}")
+    print("Application will continue without LangSmith tracing")
+    langsmith_client = None
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -48,9 +74,5 @@ def read_root():
 
 if __name__ == "__main__":
     import uvicorn
-    # print(settings.LANGSMITH_PROJECT)
-    # from langsmith import Client
-    # client = Client()
-    # url = next(client.list_runs(project_name="whatsapp-agent-project")).url
-    # print(url)
     uvicorn.run(app, host="0.0.0.0", port=8000)
+   

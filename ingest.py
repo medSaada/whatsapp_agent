@@ -2,10 +2,11 @@ import logging
 from app.services.rag.chunking_service import ChunkingService
 from app.services.rag.vector_store_service import VectorStoreService, VectorStoreConfig
 from app.core.config import get_settings
+from app.core.logging import get_logger
 
 # Configure logging
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
-logger = logging.getLogger(__name__)
+logger = get_logger()
 
 def main():
     """

@@ -5,14 +5,14 @@ from pathlib import Path
 from langchain_core.tools import BaseTool
 from typing import List
 from langchain_core.messages import ToolMessage, AIMessage, SystemMessage
-import logging
+from app.core.logging import get_logger
 from langsmith import tracing_context,Client
 from app.services.rag.generation_service import GenerationService
 from app.services.rag.graph.state import AgentState
 from langgraph.checkpoint.sqlite import SqliteSaver
 from app.core.config import Settings
 
-logger = logging.getLogger(__name__)
+logger = get_logger()
 
 
 def should_continue(state: AgentState):
@@ -49,7 +49,7 @@ class GraphBuilder:
         Returns the updated state.
         """
         current_count = state.get("interaction_count")
-        logger.info(f"Hona counts ::☝🏿️☝🏿️☝🏿️☝🏿️☝🏿️☝🏿️☝🏿️☝🏿️☝🏿️☝🏿️☝🏿️☝🏿️☝🏿️☝🏿️☝🏿️☝🏿️☝🏿️☝🏿️☝🏿️☝🏿️☝🏿️☝🏿️☝🏿️☝🏿️☝🏿️☝🏿️☝🏿️☝🏿️☝🏿️: {current_count}")
+        logger.info(f"Hona counts ::☝🏿️☝🏿️☝🏿️☝🏿️☝🏿️☝🏿️☝🏿️☝🏿️☝🏿️☝🏿️☝🏿️☝🏿️☝🏿️☝🏿️☝🏿️☝🏿️☝🏿️☝🏿️☝🏿️☝🏿️☝🏿️☝🏿️☝🏿️☝🏿️☝🏿️☝🏿️☝🏿️☝🏿️: {current_count}")
         new_count = current_count + 1
         
         logger.info(f"[Memory Management] Interaction count: {current_count} -> {new_count} (threshold: {self.memory_threshold})")

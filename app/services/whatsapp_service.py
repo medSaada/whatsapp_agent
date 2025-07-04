@@ -3,9 +3,9 @@ from app.services.meta_api_client import MetaAPIClient
 from app.services.rag.orchestrator import RAGOrchestrator
 from app.core.config import Settings, get_settings
 from fastapi import Depends
-import logging
+from app.core.logging import get_logger
 
-logger = logging.getLogger(__name__)
+logger = get_logger()
 
 class WhatsAppService:
     def __init__(self, rag_orchestrator: RAGOrchestrator, settings: Settings):

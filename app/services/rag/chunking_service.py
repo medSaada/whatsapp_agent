@@ -10,7 +10,7 @@ from typing import Optional, List, Tuple
 import os
 import sys
 import locale
-import logging
+from app.core.logging import get_logger
 
 def setup_test_environment():
     """Setup Python path for testing"""
@@ -56,8 +56,7 @@ except ImportError:
     PROJECT_ROOT = get_project_root()
 
 # Configure logging
-logging.basicConfig(level=logging.WARNING)
-logger = logging.getLogger(__name__)
+logger = get_logger()
 
 class ArabicTextHandler:
     """Handles Arabic text display and encoding issues"""

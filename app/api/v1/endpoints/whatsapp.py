@@ -3,10 +3,10 @@ from app.schemas.whatsapp import WebhookPayload
 from app.services.whatsapp_service import WhatsAppService
 from app.services.rag.orchestrator import RAGOrchestrator
 from app.core.config import Settings, get_settings
-import logging
+from app.core.logging import get_logger
 
 router = APIRouter()
-logger = logging.getLogger(__name__)
+logger = get_logger()
 
 # Dependency to get the shared RAG orchestrator from the application state
 def get_rag_orchestrator(request: Request) -> RAGOrchestrator:

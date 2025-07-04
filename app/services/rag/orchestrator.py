@@ -15,8 +15,9 @@ from app.services.rag.generation_service import GenerationService
 from app.services.rag.graph.builder import GraphBuilder
 from app.services.rag.graph.tools import create_rag_tool
 from app.core.config import Settings
+from app.core.logging import get_logger
 
-logger = logging.getLogger(__name__)
+logger = get_logger()
 
 # Enable for deep debugging of LangGraph execution
 # set_debug(True)

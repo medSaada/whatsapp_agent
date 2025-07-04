@@ -5,12 +5,11 @@ from langchain_core.documents import Document
 from typing import List, Optional, Dict, Any, Tuple, FrozenSet
 from dataclasses import dataclass
 from pathlib import Path
-import logging
+from app.core.logging import get_logger
 from datetime import datetime
 
 # Configure logging
-logging.basicConfig(level=logging.WARNING)
-logger = logging.getLogger(__name__)
+logger = get_logger()
 
 @dataclass(frozen=True)
 class VectorStoreConfig:
