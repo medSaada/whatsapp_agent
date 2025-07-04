@@ -10,8 +10,8 @@ from langsmith import tracing_context,Client
 from app.services.rag.generation_service import GenerationService
 from app.services.rag.graph.state import AgentState
 from langgraph.checkpoint.sqlite import SqliteSaver
-from app.core.config import get_settings
-settings = get_settings()
+from app.core.config import Settings
+
 logger = logging.getLogger(__name__)
 
 
@@ -37,10 +37,11 @@ class GraphBuilder:
     Builds the stateful LangGraph agent with separate planner and generator nodes.
     """
 
-    def __init__(self, generation_service: GenerationService, tools: List[BaseTool], memory_threshold: int = 6):
+    def __init__(self, generation_service: GenerationService, tools: List[BaseTool], memory_threshold: int = 6, settings: Settings = None):
         self.generation_service = generation_service
         self.tools = tools
         self.memory_threshold = memory_threshold
+        self.settings = settings
 
     def _check_memory_threshold(self, state: AgentState) -> AgentState:
         """
@@ -48,7 +49,7 @@ class GraphBuilder:
         Returns the updated state.
         """
         current_count = state.get("interaction_count")
-        logger.info(f"Hona counts ::☝🏿️☝🏿️☝🏿️☝🏿️☝🏿️☝🏿️☝🏿️☝🏿️☝🏿️☝🏿️☝🏿️☝🏿️☝🏿️☝🏿️☝🏿️☝🏿️☝🏿️☝🏿️☝🏿️☝🏿️☝🏿️☝🏿️☝🏿️☝🏿️☝🏿️☝🏿️☝🏿️☝🏿️☝🏿️☝🏿️: {current_count}")
+        logger.info(f"Hona counts ::☝🏿️☝🏿️☝🏿️☝🏿️☝🏿️☝🏿️☝🏿️☝🏿️☝🏿️☝🏿️☝🏿️☝🏿️☝🏿️☝🏿️☝🏿️☝🏿️☝🏿️☝🏿️☝🏿️☝🏿️☝🏿️☝🏿️☝🏿️☝🏿️☝🏿️☝🏿️☝🏿️☝🏿️☝🏿️: {current_count}")
         new_count = current_count + 1
         
         logger.info(f"[Memory Management] Interaction count: {current_count} -> {new_count} (threshold: {self.memory_threshold})")

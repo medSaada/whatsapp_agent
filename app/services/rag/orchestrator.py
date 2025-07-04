@@ -2,7 +2,7 @@ from typing import List, Optional, Dict, Any
 from langchain_core.documents import Document
 from langchain_core.messages import HumanMessage, ToolMessage, SystemMessage
 from langchain_core.prompts import BasePromptTemplate
-from langchain_community.embeddings import OpenAIEmbeddings
+from langchain_openai import OpenAIEmbeddings
 from langchain_openai import ChatOpenAI
 import logging
 from pathlib import Path
@@ -14,6 +14,7 @@ from app.services.rag.vector_store_service import VectorStoreService, VectorStor
 from app.services.rag.generation_service import GenerationService
 from app.services.rag.graph.builder import GraphBuilder
 from app.services.rag.graph.tools import create_rag_tool
+from app.core.config import Settings
 
 logger = logging.getLogger(__name__)
 
@@ -32,6 +33,7 @@ class RAGOrchestrator:
     """
     
     def __init__(self, 
+                 settings: Settings,  
                  vector_store_path: str = "data/vector_store",
                  collection_name: str = "production_collection",
                  model_name: str = "gpt-4.1",
@@ -42,14 +44,24 @@ class RAGOrchestrator:
         Initialize the RAG Orchestrator services.
         The agent graph is not built here, but on-demand.
         """
+        self.settings = settings
         self.collection_name = collection_name
         self.db_path = db_path
         self._graph = None # The graph will be built lazily
         self.memory_threshold = memory_threshold
         
-        # 1. Initialize core services
-        llm = ChatOpenAI(model=model_name, temperature=temperature)
-        self.vector_store_service = self._init_vector_store(vector_store_path, collection_name)
+        # 1. Initialize core services with settings
+        llm = ChatOpenAI(
+            model=model_name, 
+            temperature=temperature,
+            api_key=settings.OPENAI_API_KEY
+        )
+        embeddings = OpenAIEmbeddings(
+            model="text-embedding-ada-002",
+            api_key=settings.OPENAI_API_KEY
+        )
+        
+        self.vector_store_service = self._init_vector_store(vector_store_path, collection_name, embeddings)
         self.generation_service = self._init_generation_service(llm)
         
         logger.info(f"RAG Orchestrator initialized for collection: {collection_name}")
@@ -72,15 +84,20 @@ class RAGOrchestrator:
         
         logger.info("Building LangGraph agent...")
         rag_tool = create_rag_tool(self.vector_store_service, self.collection_name)
-        builder = GraphBuilder(self.generation_service, [rag_tool], memory_threshold=self.memory_threshold)
+        builder = GraphBuilder(
+            generation_service=self.generation_service, 
+            tools=[rag_tool], 
+            memory_threshold=self.memory_threshold,
+            settings=self.settings  # Pass settings to GraphBuilder
+        )
         self._graph = builder.build(self.db_path)
         logger.info("LangGraph agent built successfully.")
         
         return self._graph
 
-    def _init_vector_store(self, store_path: str, collection_name: str) -> VectorStoreService:
+    def _init_vector_store(self, store_path: str, collection_name: str, embeddings: OpenAIEmbeddings) -> VectorStoreService:
         config = VectorStoreConfig(store_path=store_path, collection_name=collection_name)
-        return VectorStoreService(config)
+        return VectorStoreService(config, embedding_model=embeddings)
 
     def _init_generation_service(
         self, llm: ChatOpenAI
@@ -157,3 +174,4 @@ class RAGOrchestrator:
         logger.info("Cleaning up RAG Orchestrator resources...")
         if self.vector_store_service:
             self.vector_store_service.cleanup()
+        logger.info("RAG Orchestrator cleanup completed.")

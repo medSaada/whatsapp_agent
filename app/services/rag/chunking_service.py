@@ -3,7 +3,7 @@ from langchain_openai import ChatOpenAI
 import langchain_core.prompts 
 from langchain_community.document_loaders import TextLoader
 from langchain.text_splitter import NLTKTextSplitter
-from langchain_community.embeddings import OpenAIEmbeddings
+from langchain_openai import OpenAIEmbeddings
 from langchain.text_splitter import CharacterTextSplitter
 from langchain_experimental.text_splitter import SemanticChunker
 from typing import Optional, List, Tuple
@@ -413,7 +413,7 @@ def test_separator_chunking():
     
     return chunks
 
-def test_semantic_chunking():
+def test_semantic_chunking(settings=None):
     """Test semantic chunking"""
     logger.info("=== Testing Semantic Chunking ===")
     
@@ -421,7 +421,13 @@ def test_semantic_chunking():
     if not chunker:
         return None
     
-    embeddings = OpenAIEmbeddings()
+    # Create embeddings with settings if provided
+    if settings:
+        embeddings = OpenAIEmbeddings(api_key=settings.OPENAI_API_KEY)
+    else:
+        # Fallback for testing without settings
+        embeddings = OpenAIEmbeddings()
+        
     chunks = chunker.semantic_chunking(
         breakpoint_threshold_type="percentile",
         embeddings=embeddings
@@ -435,7 +441,7 @@ def test_semantic_chunking():
     
     return chunks
 
-def test_combined_chunking():
+def test_combined_chunking(settings=None):
     """Test combined separator + semantic chunking"""
     logger.info("=== Testing Combined Chunking ===")
     
@@ -443,7 +449,13 @@ def test_combined_chunking():
     if not chunker:
         return None
     
-    embeddings = OpenAIEmbeddings()
+    # Create embeddings with settings if provided
+    if settings:
+        embeddings = OpenAIEmbeddings(api_key=settings.OPENAI_API_KEY)
+    else:
+        # Fallback for testing without settings
+        embeddings = OpenAIEmbeddings()
+        
     chunks = chunker.semantic_with_separator_chunking(
         separator="--",
         breakpoint_threshold_type="percentile",
