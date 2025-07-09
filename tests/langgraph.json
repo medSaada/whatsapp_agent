@@ -1,9 +1,0 @@
-{
-    "python_version": "3.11",
-    "dependencies": ["../../../../requirements.txt"],
-    "env": "../../../../.env",
-    "graphs": {
-      "agent_whatsapp_emulator": "./builder.py:graph_builder"
-    }
-  }
-  

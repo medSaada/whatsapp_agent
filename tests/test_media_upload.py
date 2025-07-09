@@ -24,7 +24,7 @@ logger = get_logger()
 
 def test_media_upload():
     """Test the media upload functionality"""
-    print("🧪 Testing WhatsApp Media Upload")
+    print("Testing WhatsApp Media Upload")
     print("=" * 50)
     
     try:
@@ -32,15 +32,15 @@ def test_media_upload():
         settings = get_settings()
         client = MetaAPIClient(settings)
         
-        print("✅ API client initialized successfully")
-        print(f"📱 Phone Number ID: {settings.META_PHONE_NUMBER_ID}")
-        print(f"🌐 API Base URL: {settings.GRAPH_API_URL}")
+        print("API client initialized successfully")
+        print(f"Phone Number ID: {settings.META_PHONE_NUMBER_ID}")
+        print(f"API Base URL: {settings.GRAPH_API_URL}")
         
         # Test file path (you can change this to your test file)
-        test_file_path = input("\n📁 Enter path to test media file (or press Enter to skip): ").strip()
+        test_file_path = input("\nEnter path to test media file (or press Enter to skip): ").strip()
         
         if not test_file_path:
-            print("⏭️  Skipping file upload test")
+            print("Skipping file upload test")
             return
         
         # Remove quotes if present
@@ -48,26 +48,26 @@ def test_media_upload():
         
         # Check if file exists
         if not os.path.exists(test_file_path):
-            print(f"❌ File not found: {test_file_path}")
+            print(f"File not found: {test_file_path}")
             return
         
-        print(f"\n📤 Uploading file: {os.path.basename(test_file_path)}")
-        print("⏳ Please wait...")
+        print(f"\nUploading file: {os.path.basename(test_file_path)}")
+        print("Please wait...")
         
         # Upload the media
         result = client.upload_media(test_file_path)
         
         if result:
             print("\n" + "=" * 50)
-            print("✅ UPLOAD SUCCESSFUL!")
+            print("UPLOAD SUCCESSFUL!")
             print("=" * 50)
-            print(f"📱 Media ID: {result['id']}")
-            print(f"📂 File Name: {result['file_name']}")
-            print(f"📊 Media Type: {result['media_type']}")
-            print("\n💡 You can now use this Media ID in your WhatsApp templates!")
+            print(f"Media ID: {result['id']}")
+            print(f"File Name: {result['file_name']}")
+            print(f"Media Type: {result['media_type']}")
+            print("\nYou can now use this Media ID in your WhatsApp templates!")
             
             # Show template usage example
-            print("\n📝 Template Usage Example:")
+            print("\nTemplate Usage Example:")
             print("-" * 30)
             if result['media_type'] == 'video':
                 print(f'''
@@ -98,17 +98,17 @@ def test_media_upload():
             
             return result
         else:
-            print("\n❌ Upload failed - no result returned")
+            print("\nUpload failed - no result returned")
             return None
             
     except Exception as e:
-        print(f"\n❌ Test failed with error: {e}")
+        print(f"\nTest failed with error: {e}")
         logger.error(f"Media upload test failed: {e}", exc_info=True)
         return None
 
 def test_api_credentials():
     """Test if API credentials are properly configured"""
-    print("\n🔐 Testing API Credentials")
+    print("\nTesting API Credentials")
     print("-" * 30)
     
     try:
@@ -124,46 +124,46 @@ def test_api_credentials():
         all_present = True
         for var_name, var_value in required_vars.items():
             if var_value:
-                print(f"✅ {var_name}: {'*' * min(len(str(var_value)), 20)}...")
+                print(f"{var_name}: {'*' * min(len(str(var_value)), 20)}...")
             else:
-                print(f"❌ {var_name}: Not set")
+                print(f"{var_name}: Not set")
                 all_present = False
         
         if all_present:
-            print("\n✅ All required credentials are configured")
+            print("\nAll required credentials are configured")
             return True
         else:
-            print("\n❌ Some credentials are missing. Check your .env file.")
+            print("\nSome credentials are missing. Check your .env file.")
             return False
             
     except Exception as e:
-        print(f"❌ Error checking credentials: {e}")
+        print(f"Error checking credentials: {e}")
         return False
 
 def main():
     """Main test function"""
-    print("🧪 WhatsApp Media Upload Test Suite")
+    print("WhatsApp Media Upload Test Suite")
     print("=" * 50)
     
     # Test credentials first
     if not test_api_credentials():
-        print("\n⚠️  Cannot proceed without proper credentials")
+        print("\nCannot proceed without proper credentials")
         return
     
     # Test media upload
     result = test_media_upload()
     
     if result:
-        print("\n🎉 All tests passed!")
+        print("\nAll tests passed!")
         print("You can now use the media upload functionality in your application.")
     else:
-        print("\n⚠️  Some tests failed. Check the output above for details.")
+        print("\nSome tests failed. Check the output above for details.")
 
 if __name__ == "__main__":
     try:
         main()
     except KeyboardInterrupt:
-        print("\n\n👋 Test cancelled by user.")
+        print("\n\nTest cancelled by user.")
     except Exception as e:
-        print(f"\n❌ Unexpected error: {e}")
+        print(f"\nUnexpected error: {e}")
         logger.error(f"Test script error: {e}", exc_info=True) 

@@ -142,21 +142,18 @@ class VectorStoreService:
         logger.info(f"Creating and populating Qdrant collection '{collection_name}' with {len(documents)} documents")
         
         try:
-            # Step 1: Determine vector size and explicitly create the collection
             vector_size = len(self._embedding_model.embed_query("test"))
             self._client.create_collection(
                 collection_name=collection_name,
                 vectors_config=models.VectorParams(size=vector_size, distance=models.Distance.COSINE)
             )
             
-            # Step 2: Create the LangChain wrapper for the new collection
             vector_store = Qdrant(
                 client=self._client,
                 collection_name=collection_name,
                 embeddings=self._embedding_model
             )
 
-            # Step 3: Add documents to the now-existing collection
             vector_store.add_documents(documents, wait=True)
             self._vector_stores[collection_name] = vector_store
             
@@ -176,7 +173,6 @@ class VectorStoreService:
             
         except Exception as e:
             logger.error(f"Error creating Qdrant collection '{collection_name}': {e}", exc_info=True)
-            # Ensure cleanup on failure
             if self.collection_exists(collection_name):
                 self._client.delete_collection(collection_name=collection_name)
             raise RuntimeError(f"Failed to create Qdrant collection '{collection_name}': {e}")

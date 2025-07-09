@@ -3,9 +3,7 @@ import sys
 from app.core.config import get_settings
 from app.core.logging import get_logger
 
-# Get settings once at the application level
 settings = get_settings()
-
 logger = get_logger()
 
 settings.ensure_langsmith_env_vars()
@@ -16,26 +14,24 @@ from app.api.v1.api import api_router
 from app.services.rag.orchestrator import RAGOrchestrator
 import os
 
-# LangSmith imports and setup (now safe because env vars are set)
 try:
     from langsmith import tracing_context, Client
     
-    
     langsmith_client = Client()
-    print(f"LangSmith connected successfully to project: {settings.LANGSMITH_PROJECT}")
+    logger.info(f"LangSmith connected successfully to project: {settings.LANGSMITH_PROJECT}")
     
     try:
         runs = list(langsmith_client.list_runs(project_name=settings.LANGSMITH_PROJECT, limit=1))
         if runs:
-            print(f" Latest run URL: {runs[0].url}")
+            logger.info(f"Latest run URL: {runs[0].url}")
         else:
-            print("No runs found yet - this will be the first!")
+            logger.info("No runs found yet - this will be the first!")
     except Exception as url_error:
-        print(f"ould not fetch run URL (this is normal for new projects): {url_error}")
+        logger.warning(f"Could not fetch run URL (this is normal for new projects): {url_error}")
         
 except Exception as langsmith_error:
-    print(f"LangSmith initialization failed: {langsmith_error}")
-    print("Application will continue without LangSmith tracing")
+    logger.warning(f"LangSmith initialization failed: {langsmith_error}")
+    logger.info("Application will continue without LangSmith tracing")
     langsmith_client = None
 
 @asynccontextmanager

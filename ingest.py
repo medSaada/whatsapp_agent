@@ -4,7 +4,6 @@ from app.services.rag.vector_store_service import VectorStoreService, VectorStor
 from app.core.config import get_settings
 from app.core.logging import get_logger
 
-# Configure logging
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 logger = get_logger()
 
@@ -17,23 +16,19 @@ def main():
     try:
         settings = get_settings()
         
-        # --- 1. Initialize Services ---
         vector_store_path = "data/vector_store"
-        collection_name = "production_collection" # Using a more descriptive name
+        collection_name = "production_collection"
         
-        # Setup VectorStoreService
         config = VectorStoreConfig(
             store_path=vector_store_path,
             collection_name=collection_name
         )
         vector_store_service = VectorStoreService(config)
 
-        # --- 2. If collection already exists, delete it for a clean slate ---
         if vector_store_service.collection_exists(collection_name):
             logger.info(f"Collection '{collection_name}' already exists. Deleting it to ensure a fresh start.")
             vector_store_service.delete_collection(collection_name)
         
-        # --- 3. Chunking ---
         logger.info(f"Loading documents from paths: {settings.DOCUMENT_PATHS}")
         chunker = ChunkingService(settings.DOCUMENT_PATHS)
         
@@ -49,7 +44,6 @@ def main():
         logger.info(f"Successfully created {len(chunks)} chunks.")
         logger.info(f"Documents loaded: {chunks}")
 
-        # --- 4. Ingestion ---
         logger.info(f"Creating collection '{collection_name}' and ingesting {len(chunks)} chunks.")
         collection_info = vector_store_service.create_collection(collection_name, chunks)
         
@@ -62,7 +56,6 @@ def main():
         logger.error(f"An error occurred during the ingestion process: {e}", exc_info=True)
     finally:
         logger.info("Data ingestion process finished.")
-        # Clean up if necessary, though VectorStoreService doesn't require explicit cleanup after ingestion
         if 'vector_store_service' in locals() and vector_store_service:
             vector_store_service.cleanup()
 
