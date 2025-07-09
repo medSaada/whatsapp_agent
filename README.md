@@ -1,4 +1,4 @@
-# 🤖 WhatsApp Customer Service AI Agent for Moroccan Market
+#  WhatsApp Customer Service AI Agent for Moroccan Market
 
 [![Python](https://img.shields.io/badge/Python-3.8+-blue.svg)](https://python.org)
 [![FastAPI](https://img.shields.io/badge/FastAPI-0.100+-green.svg)](https://fastapi.tiangolo.com)
