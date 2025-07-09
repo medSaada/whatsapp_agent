@@ -184,33 +184,6 @@ ngrok http 8000
 
 Configure WhatsApp webhook URL: `https://your-ngrok-url.ngrok.io/api/v1/webhook`
 
-## 📱 Multilingual Usage Examples
-
-### **Darija (Moroccan Arabic) Conversation**
-```
-User: السلام عليكم، واش عندكم دورات البرمجة؟
-Agent: وعلكوم السلام ورحمة الله وبركاته 😊
-معاكوم فاطمة الزهراء من فريق geniats
-إييه، عندنا دورات برمجة بلغة Scratch للوليدات من 6 حتى 15 عام
-كيفاش نقدر نعاونكوم؟
-```
-
-### **French Business Inquiry**
-```
-User: Bonjour, pourriez-vous me donner des informations sur vos tarifs ?
-Agent: Bonjour ! Je suis Fatima-Zahra de l'équipe Geniats.
-Nos tarifs sont de 490dh par mois, avec une offre de lancement à 400dh.
-Nous proposons également un essai à 50dh remboursable.
-```
-
-### **English International Support**
-```
-User: Hello, what programming languages do you teach?
-Agent: Hello! I'm Fatima-Zahra from Geniats support team.
-We teach Scratch programming for children aged 6-15, and for advanced 
-levels, we move to Python. All courses include live weekly sessions 
-with engineer instructors.
-```
 
 ## 🔧 LangGraph Configuration
 
