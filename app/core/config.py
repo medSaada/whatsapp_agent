@@ -26,7 +26,7 @@ class Settings(BaseSettings):
     API_V1_STR: str = "/api/v1"
     
     # Graph API
-    GRAPH_API_VERSION: str = "v20.0"
+    GRAPH_API_VERSION: str = "v23.0"
     
     # Document paths for RAG
     DOCUMENT_PATH_1: str 
@@ -61,9 +61,7 @@ class Settings(BaseSettings):
             if var_value:  # Only set if value exists
                 os.environ[var_name] = var_value
                 
-        # Optional: Log which variables were set (for debugging)
-        if langsmith_vars:
-            logger.info(f"LangSmith environment variables set: {', '.join(langsmith_vars.keys())}")
+       
     
     class Config:     
         env_file = ".env"

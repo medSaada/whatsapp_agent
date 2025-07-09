@@ -6,7 +6,7 @@ from app.core.config import Settings, get_settings
 from app.core.logging import get_logger
 
 router = APIRouter()
-logger = get_logger()
+logging = get_logger()
 
 # Dependency to get the shared RAG orchestrator from the application state
 def get_rag_orchestrator(request: Request) -> RAGOrchestrator:

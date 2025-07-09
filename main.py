@@ -22,9 +22,8 @@ try:
     
     
     langsmith_client = Client()
-    print(f"✅ LangSmith connected successfully to project: {settings.LANGSMITH_PROJECT}")
+    print(f"LangSmith connected successfully to project: {settings.LANGSMITH_PROJECT}")
     
-    # Optional: Get project URL for debugging
     try:
         runs = list(langsmith_client.list_runs(project_name=settings.LANGSMITH_PROJECT, limit=1))
         if runs:
@@ -46,17 +45,15 @@ async def lifespan(app: FastAPI):
     Initializes a single RAGOrchestrator instance to be shared across the application,
     preventing file-locking errors and improving maintainability.
     """
-    # Create RAGOrchestrator with settings dependency injection
     app.state.rag_orchestrator = RAGOrchestrator(
-        settings=settings,  # Pass settings as dependency
+        settings=settings, 
         vector_store_path="data/vector_store",
         collection_name="production_collection",
         model_name="gpt-4.1",
         temperature=0.2,
-        memory_threshold=6  # Summarize and wipe memory every 6 interactions
+        memory_threshold=6  
     )
     yield
-    # Cleanup, like closing database connections, can happen here after `yield`
     app.state.rag_orchestrator.cleanup()
 
 app = FastAPI(

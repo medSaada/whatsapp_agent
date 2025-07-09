@@ -6,7 +6,6 @@ from langchain_core.tools import BaseTool
 from typing import List
 from langchain_core.messages import ToolMessage, AIMessage, SystemMessage
 from app.core.logging import get_logger
-from langsmith import tracing_context,Client
 from app.services.rag.generation_service import GenerationService
 from app.services.rag.graph.state import AgentState
 from langgraph.checkpoint.sqlite import SqliteSaver
@@ -42,14 +41,13 @@ class GraphBuilder:
         self.tools = tools
         self.memory_threshold = memory_threshold
         self.settings = settings
-
+    
     def _check_memory_threshold(self, state: AgentState) -> AgentState:
         """
         Check if memory threshold is reached and handle summarization if needed.
         Returns the updated state.
         """
         current_count = state.get("interaction_count")
-        logger.info(f"Hona counts ::☝🏿️☝🏿️☝🏿️☝🏿️☝🏿️☝🏿️☝🏿️☝🏿️☝🏿️☝🏿️☝🏿️☝🏿️☝🏿️☝🏿️☝🏿️☝🏿️☝🏿️☝🏿️☝🏿️☝🏿️☝🏿️☝🏿️☝🏿️☝🏿️☝🏿️☝🏿️☝🏿️☝🏿️: {current_count}")
         new_count = current_count + 1
         
         logger.info(f"[Memory Management] Interaction count: {current_count} -> {new_count} (threshold: {self.memory_threshold})")
@@ -76,8 +74,8 @@ class GraphBuilder:
                     summarizer_chain = self.generation_service.get_summarizer_chain()
                     summary = summarizer_chain.invoke({"history": conversation_text})
                     
-                    logger.info(f"[Memory Management] 📝 SUMMARY CREATED: {summary}")
-                    logger.info(f"[Memory Management] ✅ Memory wiped and reset. Starting fresh with summary.")
+                    logger.info(f"[Memory Management] SUMMARY CREATED: {summary}")
+                    logger.info(f"[Memory Management] Memory wiped and reset. Starting fresh with summary.")
                     
                     # Create new state with summary as system message and reset messages
                     summary_message = SystemMessage(content=f"Previous conversation summary: {summary}")
@@ -115,7 +113,6 @@ class GraphBuilder:
                 "context": state.get("context", ""),
                 "interaction_count": 1
             }
-
     def _planner_node(self, state: AgentState):
         """The 'brain' of the agent. Decides the next action."""
         # Ensure state has all required keys
@@ -176,3 +173,11 @@ class GraphBuilder:
 
         # Compile the graph, connecting it to the checkpointer
         return workflow.compile(checkpointer=memory) 
+
+
+# visualize graph
+if __name__ == "__main__":
+    from IPython.display import display, Image
+    
+    graph = GraphBuilder(generation_service=GenerationService(), tools=[]).build(db_path="test.db")
+    display(Image(graph.get_graph().draw_mermaid_png()))
