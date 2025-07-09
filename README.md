@@ -1,51 +1,80 @@
-# 🤖 WhatsApp Agent for Geniats E-Learning Academy
+# 🤖 WhatsApp Customer Service AI Agent for Moroccan Market
 
 [![Python](https://img.shields.io/badge/Python-3.8+-blue.svg)](https://python.org)
 [![FastAPI](https://img.shields.io/badge/FastAPI-0.100+-green.svg)](https://fastapi.tiangolo.com)
 [![LangChain](https://img.shields.io/badge/LangChain-0.3+-purple.svg)](https://langchain.com)
+[![LangGraph](https://img.shields.io/badge/LangGraph-0.2+-orange.svg)](https://langchain-ai.github.io/langgraph/)
 [![License](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 
-A sophisticated AI-powered WhatsApp customer service agent for **Geniats**, an e-learning coding academy for Moroccan children aged 6-15. This agent provides intelligent, multilingual customer support using advanced RAG (Retrieval Augmented Generation) capabilities.
+An intelligent **multilingual WhatsApp customer service AI agent** designed specifically for **Moroccan customers**. Built with **LangGraph orchestration** and **RAG (Retrieval Augmented Generation)**, this agent seamlessly handles conversations in **Darija (Moroccan Arabic)**, **French**, and **English**, providing contextually accurate responses for **Geniats** e-learning academy.
 
-## 🌟 Features
+## 🎯 Project Overview
 
-### 🎯 Core Capabilities
-- **Intelligent Customer Service**: AI-powered responses using GPT-4 with custom persona
-- **Multilingual Support**: Seamless conversation in Arabic (Darija) and French
-- **RAG Integration**: Context-aware responses using vector store knowledge base
-- **WhatsApp Business API**: Native integration with Meta's WhatsApp platform
-- **Conversation Memory**: Persistent conversation tracking and summarization
-- **Real-time Processing**: Immediate response to incoming messages
+This project creates an AI-powered customer service agent that:
+- **Speaks Like a Local**: Native-level conversations in Darija, French, and English
+- **Understands Context**: Uses RAG to retrieve relevant information from knowledge base
+- **Orchestrates Intelligently**: LangGraph manages complex conversation flows and decision-making
+- **Serves Moroccan Market**: Culturally adapted responses for Moroccan customers
 
-### 🧠 AI & Machine Learning
-- **Advanced Language Models**: GPT-4.1 for generation, OpenAI embeddings for retrieval
-- **Vector Database**: Chroma/Qdrant for efficient document retrieval
-- **LangGraph Orchestration**: State machine for complex conversation flows
-- **Semantic Chunking**: Intelligent document processing and indexing
-- **Custom Personas**: "Fatima-Zahra" - culturally appropriate customer service agent
+## 🌟 Core Features
 
-### 🔧 Technical Features
-- **FastAPI Backend**: Modern, async Python web framework
-- **Webhook Processing**: Real-time message handling from WhatsApp
-- **Template Messages**: Automated responses for common queries
-- **Status Tracking**: Message delivery and read receipt monitoring
-- **Error Handling**: Robust logging and error management
-- **LangSmith Integration**: Advanced monitoring and debugging
+### 🗣️ **Multilingual Communication**
+- **Darija (Moroccan Arabic)**: Natural conversations using Arabic script with proper punctuation (،؟!)
+- **French**: Professional business communication for formal inquiries
+- **English**: International customer support capabilities
+- **Language Detection**: Automatically responds in the user's preferred language
+- **Cultural Adaptation**: Moroccan-specific greetings, expressions, and business etiquette
 
-## 🏗️ Architecture
+### 🧠 **LangGraph-Powered Intelligence**
+- **State Machine Orchestration**: LangGraph manages conversation flow and decision trees
+- **Multi-Agent Architecture**: Planner → Tool Caller → Generator workflow
+- **Conversation Memory**: Persistent memory with intelligent summarization
+- **Context Switching**: Seamless transitions between different conversation topics
+- **Tool Integration**: Dynamic tool selection based on user queries
+
+### 📚 **RAG (Retrieval Augmented Generation)**
+- **Vector Database**: Chroma/Qdrant for semantic document retrieval
+- **Smart Chunking**: Intelligent document processing and indexing
+- **Context-Aware Responses**: Retrieves relevant information before generating answers
+- **Knowledge Base**: Comprehensive information about courses, pricing, and policies
+- **Real-time Updates**: Dynamic knowledge base updates without retraining
+
+### 🔧 **Technical Infrastructure**
+- **FastAPI Backend**: High-performance async Python web framework
+- **WhatsApp Business API**: Native Meta integration for message processing
+- **Webhook Processing**: Real-time message handling and status tracking
+- **OpenAI Integration**: GPT-4.1 for generation, embeddings for retrieval
+- **Monitoring**: LangSmith integration for conversation analytics
+
+## 🏗️ LangGraph Architecture
 
 ```
 ┌─────────────────┐    ┌──────────────────┐    ┌─────────────────┐
-│   WhatsApp      │    │   FastAPI        │    │   RAG System    │
-│   Business API  │◄──►│   Application    │◄──►│   (LangGraph)   │
-└─────────────────┘    └──────────────────┘    └─────────────────┘
-                                │                         │
-                                ▼                         ▼
-                       ┌──────────────────┐    ┌─────────────────┐
-                       │   Webhook        │    │   Vector Store  │
-                       │   Processing     │    │   (Chroma/      │
-                       └──────────────────┘    │   Qdrant)       │
-                                               └─────────────────┘
+│   WhatsApp      │    │   FastAPI        │    │   LangGraph     │
+│   Business API  │◄──►│   Webhook        │◄──►│   Orchestrator  │
+└─────────────────┘    │   Handler        │    └─────────────────┘
+                       └──────────────────┘              │
+                                                         ▼
+                    ┌─────────────────────────────────────────────────┐
+                    │              LangGraph State Machine            │
+                    │                                                 │
+                    │  ┌─────────┐   ┌─────────────┐   ┌───────────┐ │
+                    │  │ Planner │──►│ Tool Caller │──►│ Generator │ │
+                    │  │  Node   │   │    Node     │   │   Node    │ │
+                    │  └─────────┘   └─────────────┘   └───────────┘ │
+                    │                        │                       │
+                    │                        ▼                       │
+                    │              ┌─────────────────┐               │
+                    │              │   RAG Tools     │               │
+                    │              │ Vector Retrieval│               │
+                    │              └─────────────────┘               │
+                    └─────────────────────────────────────────────────┘
+                                             │
+                                             ▼
+                                   ┌─────────────────┐
+                                   │   Vector Store  │
+                                   │ (Chroma/Qdrant) │
+                                   └─────────────────┘
 ```
 
 ### 🗂️ Project Structure
@@ -53,25 +82,32 @@ A sophisticated AI-powered WhatsApp customer service agent for **Geniats**, an e
 ```
 whatsapp_agent_poc/
 ├── app/
-│   ├── api/v1/              # API routes and endpoints
-│   ├── core/                # Configuration, logging, prompts
-│   ├── schemas/             # Pydantic models for data validation
+│   ├── api/v1/              # FastAPI routes and webhook endpoints
+│   ├── core/
+│   │   ├── config.py        # Environment configuration
+│   │   ├── prompt.py        # LangGraph node prompts (Planner, Generator)
+│   │   └── logging.py       # Comprehensive logging system
+│   ├── schemas/             # Pydantic models for WhatsApp payloads
 │   └── services/
-│       ├── whatsapp_service.py    # WhatsApp message processing
-│       ├── meta_api_client.py     # Meta API integration
-│       └── rag/                   # RAG system components
-│           ├── orchestrator.py    # Main RAG coordinator
+│       ├── whatsapp_service.py     # Main WhatsApp message orchestration
+│       ├── meta_api_client.py      # Meta API integration
+│       └── rag/                    # RAG System Components
+│           ├── orchestrator.py     # LangGraph workflow coordinator
 │           ├── generation_service.py  # LLM response generation
-│           ├── vector_store_service.py # Document retrieval
-│           ├── chunking_service.py    # Document processing
-│           └── graph/             # LangGraph state machine
+│           ├── vector_store_service.py # Document retrieval engine
+│           ├── chunking_service.py    # Document processing pipeline
+│           └── graph/              # LangGraph Implementation
+│               ├── builder.py      # Graph construction and state management
+│               ├── nodes.py        # Individual LangGraph nodes
+│               ├── tools.py        # RAG tools for document retrieval
+│               └── state.py        # Conversation state definitions
 ├── data/
-│   ├── documents/           # Knowledge base documents
+│   ├── documents/           # Knowledge base (courses, pricing, FAQ)
 │   ├── vector_store/        # Embedded document storage
-│   └── sqlite/              # Conversation memory
-├── tests/                   # Test suite
-├── main.py                  # Application entry point
-├── ingest.py               # Data ingestion script
+│   └── sqlite/              # Conversation memory and user sessions
+├── tests/                   # Test suite and LangGraph Studio integration
+├── main.py                  # FastAPI application entry point
+├── ingest.py               # Knowledge base ingestion pipeline
 └── requirements.txt        # Python dependencies
 ```
 
@@ -79,11 +115,10 @@ whatsapp_agent_poc/
 
 ### Prerequisites
 
-- Python 3.8 or higher
-- Conda (recommended for environment management)
-- WhatsApp Business API access
-- OpenAI API key
-- ngrok (for local development)
+- Python 3.8+ with Conda environment management
+- **WhatsApp Business API** access (Meta Developer Account)
+- **OpenAI API** key for GPT-4.1 and embeddings
+- **ngrok** for local development and webhook testing
 
 ### 1. Environment Setup
 
@@ -92,159 +127,180 @@ whatsapp_agent_poc/
 conda create -n app-whatsapp-agent python=3.8
 conda activate app-whatsapp-agent
 
-# Install dependencies
+# Install all dependencies including LangGraph
 pip install -r requirements.txt
 ```
 
 ### 2. Configuration
 
-Create a `.env` file in the project root:
+Create a `.env` file with required API keys:
 
 ```env
-# Meta WhatsApp Business API
+# WhatsApp Business API (Meta)
 META_ACCESS_TOKEN=your_meta_access_token
 META_VERIFY_TOKEN=your_verify_token
 META_WABA_ID=your_whatsapp_business_account_id
 META_PHONE_NUMBER_ID=your_phone_number_id
 
-# OpenAI Configuration
+# OpenAI for LLM and Embeddings
 OPENAI_API_KEY=your_openai_api_key
 
 # Additional AI Services
 HF_TOKEN=your_huggingface_token
 COHERE_API_KEY=your_cohere_api_key
 
-# LangSmith (Optional - for monitoring)
+# LangSmith Monitoring (Optional)
 LANGSMITH_TRACING=true
 LANGSMITH_ENDPOINT=https://api.smith.langchain.com
 LANGSMITH_API_KEY=your_langsmith_api_key
-LANGSMITH_PROJECT=your_project_name
+LANGSMITH_PROJECT=moroccan_whatsapp_agent
 LANGCHAIN_TRACING_V2=true
 
-# Document paths for knowledge base
+# Knowledge Base Documents
 DOCUMENT_PATH_1=data/documents/manual_data_fz.txt
 DOCUMENT_PATH_2=data/documents/datagenerated_assistant.txt
 ```
 
-### 3. Data Ingestion
-
-Prepare the knowledge base by ingesting your documents:
+### 3. Initialize Knowledge Base
 
 ```bash
+# Process and embed documents into vector store
 python ingest.py
 ```
 
-### 4. Run the Application
+### 4. Launch the Application
 
 ```bash
-# Start the FastAPI server
+# Start FastAPI server with LangGraph orchestration
 uvicorn main:app --host 0.0.0.0 --port 8000 --reload
 ```
 
-### 5. Setup Webhook (Development)
+### 5. Setup Development Webhook
 
 ```bash
-# In a separate terminal, expose your local server
+# Expose local server for WhatsApp webhook testing
 ngrok http 8000
 ```
 
-Configure your WhatsApp webhook URL: `https://your-ngrok-url.ngrok.io/api/v1/webhook`
+Configure WhatsApp webhook URL: `https://your-ngrok-url.ngrok.io/api/v1/webhook`
 
-## 📖 Usage
+## 📱 Multilingual Usage Examples
 
-### WhatsApp Integration
+### **Darija (Moroccan Arabic) Conversation**
+```
+User: السلام عليكوم، واش عندكوم دورات البرمجة؟
+Agent: وعليكوم السلام ورحمة الله وبركاته 😊
+معاكوم فاطمة الزهراء من فريق geniats
+إييه، عندنا دورات برمجة بلغة Scratch للوليدات من 6 حتى 15 عام
+كيفاش نقدر نعاونكوم؟
+```
 
-The agent automatically processes incoming WhatsApp messages and provides intelligent responses based on:
+### **French Business Inquiry**
+```
+User: Bonjour, pourriez-vous me donner des informations sur vos tarifs ?
+Agent: Bonjour ! Je suis Fatima-Zahra de l'équipe Geniats.
+Nos tarifs sont de 490dh par mois, avec une offre de lancement à 400dh.
+Nous proposons également un essai à 50dh remboursable.
+```
 
-1. **Predefined Knowledge Base**: Information about Geniats courses, pricing, and policies
-2. **Conversation Context**: Maintains conversation history for coherent dialogue
-3. **Cultural Adaptation**: Responds appropriately in Arabic (Darija) or French
-4. **Business Logic**: Handles enrollment inquiries, course information, and support requests
+### **English International Support**
+```
+User: Hello, what programming languages do you teach?
+Agent: Hello! I'm Fatima-Zahra from Geniats support team.
+We teach Scratch programming for children aged 6-15, and for advanced 
+levels, we move to Python. All courses include live weekly sessions 
+with engineer instructors.
+```
 
-### API Endpoints
+## 🔧 LangGraph Configuration
 
-- `GET /` - Health check
-- `POST /api/v1/webhook` - WhatsApp webhook for message processing
-- `GET /api/v1/webhook` - Webhook verification
-
-### Example Conversation
-
-**User (Arabic):** السلام عليكم، شنو العرض ديالكوم؟
-**Agent:** وعليكم السلام! أنا فاطمة-زهراء من جنياتس. العرض ديالنا هو دورات برمجة بلغة Scratch للأطفال من 6 حتى 15 سنة...
-
-## 🔧 Advanced Configuration
-
-### RAG System Tuning
-
-Modify `app/services/rag/orchestrator.py`:
+### RAG Orchestrator Settings
 
 ```python
 RAGOrchestrator(
     settings=settings,
     vector_store_path="data/vector_store",
     collection_name="production_collection",
-    model_name="gpt-4.1",           # Change AI model
-    temperature=0.2,                # Adjust creativity
-    memory_threshold=6              # Conversation memory limit
+    model_name="gpt-4.1",           # Primary LLM for generation
+    temperature=0.2,                # Controlled creativity
+    memory_threshold=6              # Conversation context limit
 )
 ```
 
-### Custom Personas
+### LangGraph Node Customization
 
-Edit prompts in `app/core/prompt.py` to customize the agent's personality and responses.
+Edit `app/core/prompt.py` to modify:
+- **Planner Prompt**: Decision-making logic for tool usage
+- **Generator Prompt**: Response generation with cultural context
+- **Summarizer Prompt**: Conversation memory management
 
-### Vector Store Options
+### Multi-Language Support Configuration
 
-The system supports multiple vector stores:
-- **Chroma** (default): Local, file-based vector storage
-- **Qdrant**: Cloud-based vector database for production
+The agent automatically detects and responds in:
+1. **Darija**: Arabic script with Moroccan expressions
+2. **French**: Formal business communication
+3. **English**: International customer support
 
-## 🧪 Testing
+## 🧪 Testing & Development
 
 ```bash
-# Run the test suite
+# Run comprehensive test suite
 pytest
 
-# Test with LangGraph Studio
+# Test LangGraph workflows in isolation
 python tests/studio_test.py
+
+# Monitor conversations in LangSmith
+# Access your project dashboard for real-time analytics
 ```
 
-## 📊 Monitoring
+## 📊 LangGraph Monitoring
 
-The application includes comprehensive logging and optional LangSmith integration for:
-
-- **Request/Response Tracking**: Monitor all WhatsApp interactions
+### Conversation Flow Tracking
+- **Node Execution**: Monitor which LangGraph nodes are triggered
+- **Tool Usage**: Track RAG retrieval effectiveness
+- **State Transitions**: Analyze conversation flow patterns
 - **Performance Metrics**: Response times and success rates
-- **Error Analysis**: Detailed error logs and debugging
-- **Conversation Analytics**: User engagement and satisfaction metrics
+
+### LangSmith Integration
+- **Real-time Debugging**: Step-by-step conversation analysis
+- **A/B Testing**: Compare different prompt configurations
+- **Error Analysis**: Identify and resolve conversation failures
+- **User Analytics**: Understand customer interaction patterns
+
+## 🌍 Moroccan Market Focus
+
+### Cultural Adaptations
+- **Greetings**: Proper Islamic greetings and responses
+- **Business Etiquette**: Moroccan professional communication standards
+- **Local Context**: Understanding of Moroccan education system and family dynamics
+- **Pricing Display**: Moroccan Dirham (MAD) currency formatting
+
+### Language Switching Logic
+- **Auto-Detection**: Identifies user language from first message
+- **Consistent Response**: Maintains same language throughout conversation
+- **Mixed Language Handling**: Graceful handling of code-switching between languages
 
 ## 🤝 Contributing
 
 1. Fork the repository
-2. Create a feature branch (`git checkout -b feature/amazing-feature`)
-3. Commit your changes (`git commit -m 'Add amazing feature'`)
-4. Push to the branch (`git push origin feature/amazing-feature`)
-5. Open a Pull Request
+2. Create a feature branch (`git checkout -b feature/langgraph-enhancement`)
+3. Test your changes with LangGraph Studio
+4. Commit with clear descriptions (`git commit -m 'Add multilingual node optimization'`)
+5. Push and create a Pull Request
 
 ## 📄 License
 
-This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
+MIT License - see [LICENSE](LICENSE) file for details.
 
 ## 🙏 Acknowledgments
 
-- **LangChain** for the RAG framework
-- **FastAPI** for the web framework
-- **OpenAI** for language models
+- **LangGraph** for orchestration framework
+- **LangChain** for RAG implementation
+- **OpenAI** for multilingual language models
 - **Meta** for WhatsApp Business API
-- **Geniats Academy** for the educational mission
-
-## 📞 Support
-
-For support and questions:
-- Create an issue in this repository
-- Contact the development team
-- Check the [documentation](docs/) for detailed guides
+- **Geniats Academy** for educational mission in Morocco
 
 ---
 
-**Built with ❤️ for Geniats - Empowering the next generation of Moroccan programmers** 
+**🇲🇦 Built for Morocco - Empowering Moroccan families through AI-powered education support** 
