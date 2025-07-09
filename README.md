@@ -276,4 +276,4 @@ MIT License - see [LICENSE](LICENSE) file for details.
 
 ---
 
-**🇲🇦 Built for Morocco - Empowering Moroccan families through AI-powered education support** 
+**🇲🇦 Built for Moroccan Businesses - Empowering Moroccan campanies through AI-powered customer support** 
