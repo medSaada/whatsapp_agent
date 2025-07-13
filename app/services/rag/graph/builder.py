@@ -1,4 +1,4 @@
-from langgraph.graph import AsyncStateGraph, END
+from langgraph.graph import StateGraph, END
 from langgraph.prebuilt import ToolNode
 import sqlite3
 from pathlib import Path
@@ -8,8 +8,9 @@ from langchain_core.messages import ToolMessage, AIMessage, SystemMessage
 from app.core.logging import get_logger
 from app.services.rag.generation_service import GenerationService
 from app.services.rag.graph.state import AgentState
-from langgraph.checkpoint.sqlite import SqliteSaver
+from langgraph.checkpoint.sqlite.aio import AsyncSqliteSaver
 from app.core.config import Settings
+import asyncio
 
 logger = get_logger()
 
@@ -144,11 +145,11 @@ class GraphBuilder:
         })
         return {"messages": [response]}
 
-    async def build(self, db_path: str):
+    async def build(self, checkpointer: AsyncSqliteSaver = None):
         """
         Builds and compiles the ASYNC graph with a checkpointer for persistence.
         """
-        workflow = AsyncStateGraph(AgentState)
+        workflow = StateGraph(AgentState)
 
         # Add the async nodes
         workflow.add_node("planner", self._planner_node)
@@ -170,18 +171,16 @@ class GraphBuilder:
         workflow.add_edge("call_tool", "generator")
         workflow.add_edge("generator", END)
 
-        # Set up the checkpointer for persistent memory
-        Path(db_path).parent.mkdir(parents=True, exist_ok=True)
-        conn = sqlite3.connect(db_path, check_same_thread=False)
-        memory = SqliteSaver(conn=conn)
-
-        # Compile the async graph
-        return workflow.compile(checkpointer=memory) 
+        # Compile the async graph, with the checkpointer if provided
+        return workflow.compile(checkpointer=checkpointer)
 
 
 # visualize graph
 if __name__ == "__main__":
     from IPython.display import display, Image
+    from app.services.rag.generation_service import GenerationService
     
-    graph = GraphBuilder(generation_service=GenerationService(), tools=[]).build(db_path="test.db")
-    display(Image(graph.get_graph().draw_mermaid_png()))
+    # Building without a checkpointer for visualization purposes
+    graph_builder = GraphBuilder(generation_service=GenerationService(), tools=[])
+    runnable = asyncio.run(graph_builder.build())
+    display(Image(runnable.get_graph().draw_mermaid_png()))

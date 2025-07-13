@@ -12,16 +12,19 @@ logger = get_logger()
 class MetaAPIClient:
     def __init__(self, settings: 'Settings'):
         self.settings = settings
-        self.base_url = self.settings.GRAPH_API_URL
+        # The base URL now correctly includes the phone number ID
+        self.base_url = f"{settings.GRAPH_API_URL}/{settings.META_PHONE_NUMBER_ID}"
         self.headers = {
-            "Authorization": f"Bearer {self.settings.WHATSAPP_API_TOKEN}",
             "Content-Type": "application/json",
+            "Authorization": f"Bearer {self.settings.META_ACCESS_TOKEN}",
         }
-        self.client = httpx.AsyncClient(base_url=self.base_url, headers=self.headers)
+        # The client no longer needs base_url or headers, as they are passed per-request
+        self.async_client = httpx.AsyncClient()
 
     async def send_text_message(self, recipient_phone: str, message: str) -> Optional[Dict[str, Any]]:
         """Sends a simple text message to a WhatsApp user."""
-        url = f"{self.base_url}/{self.settings.META_PHONE_NUMBER_ID}/messages"
+        # Corrected URL: no longer appends the phone number ID
+        url = f"{self.base_url}/messages"
         payload = {
             "messaging_product": "whatsapp",
             "to": recipient_phone,
@@ -31,7 +34,8 @@ class MetaAPIClient:
         
         logger.info(f"Sending message to {recipient_phone}: '{message}'")
         try:
-            response = await self.client.post(url, json=payload)
+            # Pass headers directly in the request
+            response = await self.async_client.post(url, json=payload, headers=self.headers)
             response.raise_for_status()
             logger.info(f"Message sent successfully to {recipient_phone}. Response: {response.json()}")
             return response.json()
@@ -79,9 +83,11 @@ class MetaAPIClient:
             logger.error(f"Could not determine MIME type for {file_path}")
             return None
         
-        url = f"{self.base_url}/{self.settings.META_PHONE_NUMBER_ID}/media"
+        # Corrected URL: no longer appends the phone number ID
+        url = f"{self.base_url}/media"
+        # Corrected Authorization header to use the proper token
         headers = {
-            "Authorization": f"Bearer {self.settings.WHATSAPP_API_TOKEN}"
+            "Authorization": f"Bearer {self.settings.META_ACCESS_TOKEN}"
         }
         
         try:
@@ -96,7 +102,8 @@ class MetaAPIClient:
                 
                 logger.info(f"Uploading {media_type} file: {file_path.name}")
                 
-                response = await self.client.post(url, files=files, data=data)
+                # Pass headers directly in the request
+                response = await self.async_client.post(url, files=files, data=data, headers=headers)
                 response.raise_for_status()
                 
                 result = response.json()
@@ -138,7 +145,8 @@ class MetaAPIClient:
             language_code: Language code (e.g., 'en_US', 'ar')
             components: Optional list of template components with parameters
         """
-        url = f"{self.base_url}/{self.settings.META_PHONE_NUMBER_ID}/messages"
+        # Corrected URL: no longer appends the phone number ID
+        url = f"{self.base_url}/messages"
         payload = {
             "messaging_product": "whatsapp",
             "recipient_type": "individual",
@@ -160,7 +168,8 @@ class MetaAPIClient:
         logger.debug(f"Template payload: {payload}")  # Debug log to see the exact payload
         
         try:
-            response = await self.client.post(url, json=payload)
+            # Pass headers directly in the request
+            response = await self.async_client.post(url, json=payload, headers=self.headers)
             response.raise_for_status()
             logger.info(f"Template message sent successfully to {to}. Response: {response.json()}")
             return response.json()

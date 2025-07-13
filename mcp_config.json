@@ -1,0 +1,9 @@
+{
+    "mcpServers": {
+        "calendar": {
+            "command": "wsl",
+            "args": ["npx", "@gongrzhe/server-calendar-autoauth-mcp"],
+            "transport": "stdio"
+        }
+    }
+}

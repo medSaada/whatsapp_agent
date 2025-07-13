@@ -15,6 +15,8 @@ from fastapi import FastAPI
 from app.api.v1.api import api_router
 from app.services.rag.orchestrator import RAGOrchestrator
 from app.services.mcp_loader import initialize_mcp_client, close_mcp_client
+from langgraph.checkpoint.sqlite.aio import AsyncSqliteSaver
+from pathlib import Path
 import os
 
 # LangSmith imports and setup (now safe because env vars are set)
@@ -43,25 +45,32 @@ except Exception as langsmith_error:
 async def lifespan(app: FastAPI):
     """
     Manages application startup and shutdown events.
-    Initializes a single RAGOrchestrator instance to be shared across the application,
-    preventing file-locking errors and improving maintainability.
+    Initializes a single RAGOrchestrator instance and its resources to be shared across the application.
     """
-    # Initialize MCP client and tools on startup
-    await initialize_mcp_client()
+    db_path = "data/sqlite/conversation_memory.db"
+    Path(db_path).parent.mkdir(parents=True, exist_ok=True)
+    
+    # The checkpointer's lifecycle is now managed by the application's lifespan
+    checkpointer = AsyncSqliteSaver.from_conn_string(db_path)
+    
+    async with checkpointer as memory:
+        # Initialize MCP client and tools on startup
+        await initialize_mcp_client()
 
-    # The orchestrator will now be created asynchronously
-    app.state.rag_orchestrator = await RAGOrchestrator.create(
-        settings=settings, 
-        vector_store_path="data/vector_store",
-        collection_name="production_collection",
-        model_name="gpt-4.1",
-        temperature=0.2,
-        memory_threshold=6,
-        db_path="data/sqlite/conversation_memory.db"
-    )
-    yield
+        # The orchestrator will now be created asynchronously with the checkpointer
+        app.state.rag_orchestrator = await RAGOrchestrator.create(
+            settings=settings, 
+            checkpointer=memory,
+            vector_store_path="data/vector_store",
+            collection_name="production_collection",
+            model_name="gpt-4.1",
+            temperature=0.2,
+            memory_threshold=6
+        )
+        yield
     
     # Cleanup resources on shutdown
+    # The 'async with' block handles the checkpointer connection closure
     app.state.rag_orchestrator.cleanup()
     await close_mcp_client()
 

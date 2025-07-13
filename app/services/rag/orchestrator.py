@@ -9,8 +9,9 @@ from pathlib import Path
 from langchain.globals import set_debug
 from langgraph.checkpoint.sqlite import SqliteSaver
 import sqlite3
-from langgraph.graph import AsyncStateGraph
+from langgraph.graph import StateGraph
 from app.services.mcp_loader import get_mcp_tools
+from langgraph.checkpoint.sqlite.aio import AsyncSqliteSaver
 
 from app.services.rag.vector_store_service import VectorStoreService, VectorStoreConfig
 from app.services.rag.generation_service import GenerationService
@@ -36,22 +37,22 @@ class RAGOrchestrator:
     """
     
     # Make __init__ lightweight and synchronous
-    def __init__(self, settings: Settings, graph: AsyncStateGraph, vector_store_service: VectorStoreService):
+    def __init__(self, settings: Settings, graph: StateGraph, vector_store_service: VectorStoreService):
         self.settings = settings
         self._graph = graph
         self.vector_store_service = vector_store_service
-        self.collection_name = vector_store_service.collection_name
+        self.collection_name = vector_store_service.config.collection_name
         logger.info(f"RAG Orchestrator initialized for collection: {self.collection_name}")
 
     @classmethod
     async def create(
         cls,
         settings: Settings,
+        checkpointer: AsyncSqliteSaver,
         vector_store_path: str,
         collection_name: str,
         model_name: str,
         temperature: float,
-        db_path: str,
         memory_threshold: int,
     ) -> "RAGOrchestrator":
         """Asynchronously creates and initializes the RAGOrchestrator."""
@@ -78,8 +79,8 @@ class RAGOrchestrator:
             settings=settings
         )
         
-        # The graph is now built asynchronously
-        graph = await builder.build(db_path)
+        # The graph is now built asynchronously using the provided checkpointer
+        graph = await builder.build(checkpointer)
         logger.info("Async-LangGraph agent built successfully.")
         
         return cls(settings, graph, vector_store_service)
