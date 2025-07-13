@@ -20,7 +20,7 @@ class WhatsAppService:
         
         logger.info("WhatsAppService initialized with a shared RAG orchestrator")
 
-    def process_message(self, payload: WebhookPayload):
+    async def process_message(self, payload: WebhookPayload):
         """Processes an incoming webhook payload."""
         for entry in payload.entry:
             for change in entry.changes:
@@ -34,11 +34,11 @@ class WhatsAppService:
                         
                         # Check if this is a specific trigger for template messages
                         if self._should_send_template(message_text):
-                            self._send_appropriate_template(sender_id, message_text)
+                            await self._send_appropriate_template(sender_id, message_text)
                         else:
                             # Generate intelligent response using the stateful RAG agent
-                            reply_message = self._generate_rag_response(sender_id, message_text)
-                            self.meta_api_client.send_text_message(sender_id, reply_message)
+                            reply_message = await self._generate_rag_response(sender_id, message_text)
+                            await self.meta_api_client.send_text_message(sender_id, reply_message)
                 
                 # Handle message status updates
                 elif change.value.statuses:
@@ -66,7 +66,7 @@ class WhatsAppService:
         
         return any(trigger in message_lower for trigger in template_triggers)
     
-    def _send_appropriate_template(self, sender_id: str, message_text: str):
+    async def _send_appropriate_template(self, sender_id: str, message_text: str):
         """
         Sends the appropriate template based on the user's message.
         """
@@ -74,12 +74,12 @@ class WhatsAppService:
         
         if any(word in message_lower for word in ['sessions', 'جلسات', 'how sessions look']):
             # Send your Arabic template about sessions
-            self.send_sessions_template(sender_id)
+            await self.send_sessions_template(sender_id)
         else:
             # Default fallback
-            self.send_welcome_template(sender_id)
+            await self.send_welcome_template(sender_id)
     
-    def send_sessions_template(self, recipient_phone: str):
+    async def send_sessions_template(self, recipient_phone: str):
         """
         Sends your specific 'how_the_sessions_look_like' template with video from Facebook Media Library.
         This template has a header with video and a body with a variable placeholder.
@@ -88,7 +88,7 @@ class WhatsAppService:
             media_id = "1232963834726789"
             template_parameter = "اذا عندك اي سؤال مرحبا"
             
-            response = self.meta_api_client.send_template_message(
+            response = await self.meta_api_client.send_template_message(
                 to=recipient_phone,
                 template_name="how_the_sessions_look_like",
                 language_code="ar_MA",
@@ -128,7 +128,7 @@ class WhatsAppService:
             else:
                 logger.error(f"Failed to send sessions template to {recipient_phone}")
                 # Send fallback text message
-                self.meta_api_client.send_text_message(
+                await self.meta_api_client.send_text_message(
                     recipient_phone, 
                     "سأرسل لك معلومات عن كيفية إجراء الجلسات قريباً"
                 )
@@ -136,12 +136,12 @@ class WhatsAppService:
         except Exception as e:
             logger.error(f"Error sending sessions template: {e}", exc_info=True)
             # Send fallback text message
-            self.meta_api_client.send_text_message(
+            await self.meta_api_client.send_text_message(
                 recipient_phone, 
                 "عذراً، حدث خطأ. سأرسل لك المعلومات المطلوبة قريباً"
             )
 
-    def send_welcome_template(self, recipient_phone: str):
+    async def send_welcome_template(self, recipient_phone: str):
         """
         Sends a welcome template message. This is a fallback for when no specific template is matched.
         You can customize this to use any approved template you have.
@@ -149,7 +149,7 @@ class WhatsAppService:
         try:
             # For now, send a simple text message as fallback
             # You can replace this with an actual template when you have one approved
-            self.meta_api_client.send_text_message(
+            await self.meta_api_client.send_text_message(
                 recipient_phone, 
                 "مرحباً بك! أنا هنا لمساعدتك. يمكنك كتابة 'sessions' أو 'جلسات' لرؤية كيف تبدو جلساتنا."
             )
@@ -158,12 +158,12 @@ class WhatsAppService:
         except Exception as e:
             logger.error(f"Error sending welcome message: {e}", exc_info=True)
             # Final fallback
-            self.meta_api_client.send_text_message(
+            await self.meta_api_client.send_text_message(
                 recipient_phone, 
                 "مرحباً! كيف يمكنني مساعدتك اليوم؟"
             )
     
-    def _generate_rag_response(self, sender_id: str, user_message: str) -> str:
+    async def _generate_rag_response(self, sender_id: str, user_message: str) -> str:
         """
         Generates an intelligent response using the stateful RAG agent with langgraph.
         The sender_id is used to maintain conversation history.
@@ -175,7 +175,7 @@ class WhatsAppService:
                 return self._get_fallback_response(user_message)
             
             # Generate a response using the agent, which maintains state via conversation_id
-            response = self.rag_orchestrator.answer_question(
+            response = await self.rag_orchestrator.answer_question(
                 question=user_message,
                 conversation_id=sender_id 
             )

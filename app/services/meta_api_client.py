@@ -4,42 +4,43 @@ from app.core.logging import get_logger
 from typing import List, Dict, Optional
 import mimetypes
 from pathlib import Path
+import httpx
+from typing import List, Dict, Any, Optional
 
 logger = get_logger()
 
 class MetaAPIClient:
-    def __init__(self, settings: Settings):
-        """Initializes the client with the application settings."""
-        self.base_url = settings.GRAPH_API_URL
-        self.access_token = settings.META_ACCESS_TOKEN
-        self.sender_phone_id = settings.META_PHONE_NUMBER_ID
-
-    def send_text_message(self, to: str, message: str):
-        """Sends a simple text message to a WhatsApp user."""
-        url = f"{self.base_url}/{self.sender_phone_id}/messages"
-        headers = {
-            "Authorization": f"Bearer {self.access_token}",
+    def __init__(self, settings: 'Settings'):
+        self.settings = settings
+        self.base_url = self.settings.GRAPH_API_URL
+        self.headers = {
+            "Authorization": f"Bearer {self.settings.WHATSAPP_API_TOKEN}",
             "Content-Type": "application/json",
         }
+        self.client = httpx.AsyncClient(base_url=self.base_url, headers=self.headers)
+
+    async def send_text_message(self, recipient_phone: str, message: str) -> Optional[Dict[str, Any]]:
+        """Sends a simple text message to a WhatsApp user."""
+        url = f"{self.base_url}/{self.settings.META_PHONE_NUMBER_ID}/messages"
         payload = {
             "messaging_product": "whatsapp",
-            "to": to,
+            "to": recipient_phone,
             "type": "text",
             "text": {"body": message},
         }
         
-        logger.info(f"Sending message to {to}: '{message}'")
+        logger.info(f"Sending message to {recipient_phone}: '{message}'")
         try:
-            response = requests.post(url, headers=headers, json=payload)
+            response = await self.client.post(url, json=payload)
             response.raise_for_status()
-            logger.info(f"Message sent successfully to {to}. Response: {response.json()}")
+            logger.info(f"Message sent successfully to {recipient_phone}. Response: {response.json()}")
             return response.json()
-        except requests.exceptions.RequestException as e:
-            logger.error(f"Error sending message to {to}: {e}")
+        except httpx.RequestError as e:
+            logger.error(f"Error sending message to {recipient_phone}: {e}")
             logger.error(f"Response body: {e.response.text if e.response else 'No response'}")
             return None
 
-    def upload_media(self, file_path: str, media_type: str = None) -> Optional[Dict]:
+    async def upload_media(self, file_path: str, media_type: str = None) -> Optional[Dict]:
         """
         Upload media file to WhatsApp Cloud API
         
@@ -78,9 +79,9 @@ class MetaAPIClient:
             logger.error(f"Could not determine MIME type for {file_path}")
             return None
         
-        url = f"{self.base_url}/{self.sender_phone_id}/media"
+        url = f"{self.base_url}/{self.settings.META_PHONE_NUMBER_ID}/media"
         headers = {
-            "Authorization": f"Bearer {self.access_token}"
+            "Authorization": f"Bearer {self.settings.WHATSAPP_API_TOKEN}"
         }
         
         try:
@@ -95,7 +96,7 @@ class MetaAPIClient:
                 
                 logger.info(f"Uploading {media_type} file: {file_path.name}")
                 
-                response = requests.post(url, headers=headers, files=files, data=data)
+                response = await self.client.post(url, files=files, data=data)
                 response.raise_for_status()
                 
                 result = response.json()
@@ -113,7 +114,7 @@ class MetaAPIClient:
                     logger.error(f"No media ID returned from API: {result}")
                     return None
                     
-        except requests.exceptions.RequestException as e:
+        except httpx.RequestError as e:
             logger.error(f"Error uploading media {file_path}: {e}")
             if hasattr(e, 'response') and e.response is not None:
                 try:
@@ -127,7 +128,7 @@ class MetaAPIClient:
             logger.error(f"Unexpected error uploading media {file_path}: {e}")
             return None
 
-    def send_template_message(self, to: str, template_name: str, language_code: str, components: Optional[List[Dict]] = None):
+    async def send_template_message(self, to: str, template_name: str, language_code: str, components: List[Dict[str, Any]]) -> Optional[Dict[str, Any]]:
         """
         Sends a template message to a WhatsApp user.
         
@@ -137,12 +138,7 @@ class MetaAPIClient:
             language_code: Language code (e.g., 'en_US', 'ar')
             components: Optional list of template components with parameters
         """
-        url = f"{self.base_url}/{self.sender_phone_id}/messages"
-        headers = {
-            "Authorization": f"Bearer {self.access_token}",
-            "Content-Type": "application/json",
-        }
-        
+        url = f"{self.base_url}/{self.settings.META_PHONE_NUMBER_ID}/messages"
         payload = {
             "messaging_product": "whatsapp",
             "recipient_type": "individual",
@@ -164,11 +160,11 @@ class MetaAPIClient:
         logger.debug(f"Template payload: {payload}")  # Debug log to see the exact payload
         
         try:
-            response = requests.post(url, headers=headers, json=payload)
+            response = await self.client.post(url, json=payload)
             response.raise_for_status()
             logger.info(f"Template message sent successfully to {to}. Response: {response.json()}")
             return response.json()
-        except requests.exceptions.RequestException as e:
+        except httpx.RequestError as e:
             logger.error(f"Error sending template message to {to}: {e}")
             
             # Get detailed error information
@@ -183,7 +179,7 @@ class MetaAPIClient:
             
             return None
 
-    def send_template_with_media(self, to: str, template_name: str, language_code: str, 
+    async def send_template_with_media(self, to: str, template_name: str, language_code: str, 
                                 media_type: str, media_url: str, body_parameters: Optional[List[str]] = None):
         """
         Sends a template message with media (image, video, or document).
@@ -223,9 +219,9 @@ class MetaAPIClient:
             }
             components.append(body_component)
             
-        return self.send_template_message(to, template_name, language_code, components)
+        return await self.send_template_message(to, template_name, language_code, components)
 
-    def send_template_with_buttons(self, to: str, template_name: str, language_code: str,
+    async def send_template_with_buttons(self, to: str, template_name: str, language_code: str,
                                   body_parameters: Optional[List[str]] = None,
                                   button_parameters: Optional[List[Dict]] = None):
         """
@@ -269,11 +265,11 @@ class MetaAPIClient:
                 }
                 components.append(button_component)
                 
-        return self.send_template_message(to, template_name, language_code, components)
+        return await self.send_template_message(to, template_name, language_code, components)
 
-    def send_simple_template(self, to: str, template_name: str, language_code: str = "ar_MA"):
+    async def send_simple_template(self, to: str, template_name: str, language_code: str = "ar_MA"):
         """
         Sends a simple template message without any parameters.
         Perfect for templates that don't require variable substitution.
         """
-        return self.send_template_message(to, template_name, language_code) 
+        return await self.send_template_message(to, template_name, language_code) 

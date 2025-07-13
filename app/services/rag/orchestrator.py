@@ -9,6 +9,8 @@ from pathlib import Path
 from langchain.globals import set_debug
 from langgraph.checkpoint.sqlite import SqliteSaver
 import sqlite3
+from langgraph.graph import AsyncStateGraph
+from app.services.mcp_loader import get_mcp_tools
 
 from app.services.rag.vector_store_service import VectorStoreService, VectorStoreConfig
 from app.services.rag.generation_service import GenerationService
@@ -33,86 +35,61 @@ class RAGOrchestrator:
     once the required data collection is available.
     """
     
-    def __init__(self, 
-                 settings: Settings,  
-                 vector_store_path: str = "data/vector_store",
-                 collection_name: str = "production_collection",
-                 model_name: str = "gpt-4.1",
-                 temperature: float = 0.2,
-                 db_path: str = "data/sqlite/conversation_memory.db",
-                 memory_threshold: int = 6):
-        """
-        Initialize the RAG Orchestrator services.
-        The agent graph is not built here, but on-demand.
-        """
+    # Make __init__ lightweight and synchronous
+    def __init__(self, settings: Settings, graph: AsyncStateGraph, vector_store_service: VectorStoreService):
         self.settings = settings
-        self.collection_name = collection_name
-        self.db_path = db_path
-        self._graph = None # The graph will be built lazily
-        self.memory_threshold = memory_threshold
-        
-        # 1. Initialize core services with settings
-        llm = ChatOpenAI(
-            model=model_name, 
-            temperature=temperature,
-            api_key=settings.OPENAI_API_KEY
-        )
-        embeddings = OpenAIEmbeddings(
-            model="text-embedding-ada-002",
-            api_key=settings.OPENAI_API_KEY
-        )
-        
-        self.vector_store_service = self._init_vector_store(vector_store_path, collection_name, embeddings)
-        self.generation_service = self._init_generation_service(llm)
-        
-        logger.info(f"RAG Orchestrator initialized for collection: {collection_name}")
-        logger.info(f"[Memory Management] Memory threshold set to: {self.memory_threshold} interactions")
-    
-    def _get_or_build_graph(self):
-        """
-        Builds the LangGraph agent on-demand.
-        
-        If the graph is already built, it returns the cached instance.
-        If not, it checks if the required collection exists and then builds it.
-        Returns None if the system is not ready.
-        """
-        if self._graph:
-            return self._graph
+        self._graph = graph
+        self.vector_store_service = vector_store_service
+        self.collection_name = vector_store_service.collection_name
+        logger.info(f"RAG Orchestrator initialized for collection: {self.collection_name}")
 
-        if not self.is_ready():
-            logger.warning(f"Cannot build graph: Collection '{self.collection_name}' not found or is empty.")
-            return None
+    @classmethod
+    async def create(
+        cls,
+        settings: Settings,
+        vector_store_path: str,
+        collection_name: str,
+        model_name: str,
+        temperature: float,
+        db_path: str,
+        memory_threshold: int,
+    ) -> "RAGOrchestrator":
+        """Asynchronously creates and initializes the RAGOrchestrator."""
         
-        logger.info("Building LangGraph agent...")
-        rag_tool = create_rag_tool(self.vector_store_service, self.collection_name)
+        llm = ChatOpenAI(model=model_name, temperature=temperature, api_key=settings.OPENAI_API_KEY)
+        embeddings = OpenAIEmbeddings(model="text-embedding-ada-002", api_key=settings.OPENAI_API_KEY)
+        
+        vector_store_service = VectorStoreService(
+            VectorStoreConfig(store_path=vector_store_path, collection_name=collection_name),
+            embedding_model=embeddings
+        )
+        generation_service = GenerationService(llm=llm)
+
+        # Fetch all tools
+        rag_tool = create_rag_tool(vector_store_service, collection_name)
+        mcp_tools = get_mcp_tools()  # This is now a simple sync call to get cached tools
+        all_tools = [rag_tool] + mcp_tools
+
+        logger.info(f"Building Async-LangGraph agent with {len(all_tools)} tools...")
         builder = GraphBuilder(
-            generation_service=self.generation_service, 
-            tools=[rag_tool], 
-            memory_threshold=self.memory_threshold,
-            settings=self.settings  # Pass settings to GraphBuilder
+            generation_service=generation_service,
+            tools=all_tools,
+            memory_threshold=memory_threshold,
+            settings=settings
         )
-        self._graph = builder.build(self.db_path)
-        logger.info("LangGraph agent built successfully.")
         
-        return self._graph
+        # The graph is now built asynchronously
+        graph = await builder.build(db_path)
+        logger.info("Async-LangGraph agent built successfully.")
+        
+        return cls(settings, graph, vector_store_service)
 
-    def _init_vector_store(self, store_path: str, collection_name: str, embeddings: OpenAIEmbeddings) -> VectorStoreService:
-        config = VectorStoreConfig(store_path=store_path, collection_name=collection_name)
-        return VectorStoreService(config, embedding_model=embeddings)
-
-    def _init_generation_service(
-        self, llm: ChatOpenAI
-    ) -> GenerationService:
-        return GenerationService(llm=llm)
-
-    def answer_question(self, question: str, conversation_id: str) -> str:
+    async def answer_question(self, question: str, conversation_id: str) -> str:
         """
         Answer a question using the LangGraph agent, with detailed logging.
         The graph is built on the first call if it hasn't been already.
         """
-        graph = self._get_or_build_graph()
-        
-        if not graph:
+        if not self._graph:
             logger.warning("RAG system not ready, using fallback response.")
             return "Je ne suis pas encore prêt à répondre aux questions. Veuillez réessayer dans un instant."
 
@@ -124,12 +101,11 @@ class RAGOrchestrator:
                 "interaction_count": 0
             }
             
-            logger.info(f"--- Starting new RAG flow for conversation '{conversation_id}' ---")
+            logger.info(f"--- Starting new ASYNC RAG flow for conversation '{conversation_id}' ---")
             logger.info(f"[Memory Management] Processing interaction for conversation: {conversation_id}")
             
-            # Invoke the graph and wait for the final state. This is more robust
-            # than streaming and trying to interpret intermediate steps.
-            final_state = graph.invoke(input_data, config=config)
+            # Use ainvoke for the async graph
+            final_state = await self._graph.ainvoke(input_data, config=config)
             
             # The final response is the last message in the list.
             final_response = final_state["messages"][-1].content
@@ -155,7 +131,7 @@ class RAGOrchestrator:
                 return "Je n'ai pas pu générer de réponse."
 
         except Exception as e:
-            logger.error(f"Error answering question for conversation '{conversation_id}': {e}", exc_info=True)
+            logger.error(f"Error in async RAG flow for '{conversation_id}': {e}", exc_info=True)
             return f"Désolé, j'ai rencontré une erreur: {str(e)}"
     
     def is_ready(self) -> bool:

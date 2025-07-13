@@ -50,7 +50,7 @@ async def process_webhook(
     It uses the injected WhatsAppService to process the payload.
     """
     try:
-        service.process_message(payload)
+        await service.process_message(payload)
         return Response(status_code=status.HTTP_200_OK)
     except Exception as e:
         logging.error(f"Error processing webhook: {e}", exc_info=True)

@@ -1,4 +1,4 @@
-from langgraph.graph import StateGraph, END
+from langgraph.graph import AsyncStateGraph, END
 from langgraph.prebuilt import ToolNode
 import sqlite3
 from pathlib import Path
@@ -14,6 +14,7 @@ from app.core.config import Settings
 logger = get_logger()
 
 
+# This function can remain synchronous as it's pure logic
 def should_continue(state: AgentState):
     """
     Determines the next step for the agent.
@@ -34,14 +35,16 @@ def should_continue(state: AgentState):
 class GraphBuilder:
     """
     Builds the stateful LangGraph agent with separate planner and generator nodes.
+    Now builds an ASYNCHRONOUS graph.
     """
 
-    def __init__(self, generation_service: GenerationService, tools: List[BaseTool], memory_threshold: int = 6, settings: Settings = None):
+    def __init__(self, generation_service: GenerationService, tools: List, memory_threshold: int = 6, settings: Settings = None):
         self.generation_service = generation_service
-        self.tools = tools
+        self.tools = tools  # No need for sync wrappers anymore
         self.memory_threshold = memory_threshold
         self.settings = settings
     
+    # _check_memory_threshold remains the same synchronous logic
     def _check_memory_threshold(self, state: AgentState) -> AgentState:
         """
         Check if memory threshold is reached and handle summarization if needed.
@@ -113,8 +116,9 @@ class GraphBuilder:
                 "context": state.get("context", ""),
                 "interaction_count": 1
             }
-    def _planner_node(self, state: AgentState):
-        """The 'brain' of the agent. Decides the next action."""
+
+    async def _planner_node(self, state: AgentState):
+        """The 'brain' of the agent. Decides the next action asynchronously."""
         # Ensure state has all required keys
         if "context" not in state:
             state["context"] = ""
@@ -123,30 +127,30 @@ class GraphBuilder:
         updated_state = self._check_memory_threshold(state)
         
         planner_chain = self.generation_service.get_planner_chain(self.tools)
-        response = planner_chain.invoke({"messages": updated_state['messages']})
-        return {"messages": [response], "interaction_count": 1}
+        response = await planner_chain.ainvoke({"messages": updated_state['messages']})
+        return {"messages": [response], "interaction_count": updated_state.get('interaction_count', 1)}
 
  
-    def _generator_node(self, state: AgentState):
-        """The 'voice' of the agent. Generates the final response."""
+    async def _generator_node(self, state: AgentState):
+        """The 'voice' of the agent. Generates the final response asynchronously."""
         # The context is now the content of the last message (the tool output)
         context = state["messages"][-1].content
         #logger.info(f"Generator received context: {context[:200]}...")
 
         generator_chain = self.generation_service.get_generator_chain()
-        response = generator_chain.invoke({
+        response = await generator_chain.ainvoke({
             "messages": state['messages'],
             "context": context
         })
         return {"messages": [response]}
 
-    def build(self, db_path: str):
+    async def build(self, db_path: str):
         """
-        Builds and compiles the graph with a checkpointer for persistence.
+        Builds and compiles the ASYNC graph with a checkpointer for persistence.
         """
-        workflow = StateGraph(AgentState)
+        workflow = AsyncStateGraph(AgentState)
 
-        # Add the nodes
+        # Add the async nodes
         workflow.add_node("planner", self._planner_node)
         workflow.add_node("call_tool", ToolNode(self.tools))
         workflow.add_node("generator", self._generator_node)
@@ -171,7 +175,7 @@ class GraphBuilder:
         conn = sqlite3.connect(db_path, check_same_thread=False)
         memory = SqliteSaver(conn=conn)
 
-        # Compile the graph, connecting it to the checkpointer
+        # Compile the async graph
         return workflow.compile(checkpointer=memory) 
 
 

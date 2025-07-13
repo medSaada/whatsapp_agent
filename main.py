@@ -14,6 +14,7 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from app.api.v1.api import api_router
 from app.services.rag.orchestrator import RAGOrchestrator
+from app.services.mcp_loader import initialize_mcp_client, close_mcp_client
 import os
 
 # LangSmith imports and setup (now safe because env vars are set)
@@ -45,16 +46,24 @@ async def lifespan(app: FastAPI):
     Initializes a single RAGOrchestrator instance to be shared across the application,
     preventing file-locking errors and improving maintainability.
     """
-    app.state.rag_orchestrator = RAGOrchestrator(
+    # Initialize MCP client and tools on startup
+    await initialize_mcp_client()
+
+    # The orchestrator will now be created asynchronously
+    app.state.rag_orchestrator = await RAGOrchestrator.create(
         settings=settings, 
         vector_store_path="data/vector_store",
         collection_name="production_collection",
         model_name="gpt-4.1",
         temperature=0.2,
-        memory_threshold=6  
+        memory_threshold=6,
+        db_path="data/sqlite/conversation_memory.db"
     )
     yield
+    
+    # Cleanup resources on shutdown
     app.state.rag_orchestrator.cleanup()
+    await close_mcp_client()
 
 app = FastAPI(
     title="WhatsApp Agent",
