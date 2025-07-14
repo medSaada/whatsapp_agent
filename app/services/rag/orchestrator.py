@@ -98,7 +98,8 @@ class RAGOrchestrator:
             config = {"configurable": {"thread_id": conversation_id}}
             input_data = {
                 "messages": [HumanMessage(content=question)],
-                "context": "",
+                "context": "", # Kept for compatibility, but no longer primary
+                "rag_context": "",
                 "interaction_count": 0
             }
             
@@ -133,8 +134,8 @@ class RAGOrchestrator:
 
         except Exception as e:
             logger.error(f"Error in async RAG flow for '{conversation_id}': {e}", exc_info=True)
-            # Return a generic, user-friendly message instead of the raw error.
-            return "Désolé, une erreur technique est survenue. Notre équipe a été informée. Veuillez réessayer ou reformuler votre demande."
+            # Per user request, do not send a message on error, just log it.
+            return ""
     
     def is_ready(self) -> bool:
         """Check if RAG system is ready by checking if the collection exists."""

@@ -87,17 +87,22 @@ class GraphBuilder:
         last_ai_message = state["messages"][-1]
         if isinstance(last_ai_message, AIMessage) and last_ai_message.tool_calls:
             for tool_call in last_ai_message.tool_calls:
+                # Find the corresponding ToolMessage in the updates
+                tool_message = next((msg for msg in tool_updates.get("messages", []) if isinstance(msg, ToolMessage) and msg.tool_call_id == tool_call['id']), None)
+                if not tool_message:
+                    continue
+
                 if tool_call['name'] == 'notion_retrieve_database':
-                    # Find the corresponding ToolMessage in the updates
-                    for tool_message in tool_updates.get("messages", []):
-                        if isinstance(tool_message, ToolMessage) and tool_message.tool_call_id == tool_call['id']:
-                            try:
-                                schema = json.loads(tool_message.content)
-                                tool_updates['database_schema'] = schema
-                                logger.info(f"Successfully retrieved and saved Notion database schema to state.")
-                            except (json.JSONDecodeError, TypeError) as e:
-                                logger.error(f"Failed to parse or save Notion schema: {e}")
-                            break
+                    try:
+                        schema = json.loads(tool_message.content)
+                        tool_updates['database_schema'] = schema
+                        logger.info(f"Successfully retrieved and saved Notion database schema to state.")
+                    except (json.JSONDecodeError, TypeError) as e:
+                        logger.error(f"Failed to parse or save Notion schema: {e}")
+                
+                elif tool_call['name'] == 'knowledge_base_retriever':
+                    tool_updates['rag_context'] = tool_message.content
+                    logger.info(f"Successfully saved RAG context to state.")
         
         # Return the complete set of updates from the tool executions
         return tool_updates
@@ -105,8 +110,8 @@ class GraphBuilder:
  
     async def _generator_node(self, state: AgentState):
         """The 'voice' of the agent. Generates the final response asynchronously."""
-        # The context is now the content of the last message (the tool output)
-        context = state["messages"][-1].content
+        # Use the specific rag_context, which will be empty if the tool wasn't called.
+        context = state.get("rag_context", "")
         #logger.info(f"Generator received context: {context[:200]}...")
 
         generator_chain = self.generation_service.get_generator_chain()

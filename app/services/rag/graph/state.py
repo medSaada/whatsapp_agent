@@ -13,9 +13,11 @@ class AgentState(TypedDict):
         context: The retrieved context from the vector store.
         interaction_count: Counter for tracking the number of interactions for memory management.
         database_schema: Stores the Notion database schema once retrieved to avoid redundant calls.
+        rag_context: Stores the context retrieved from the knowledge base tool.
     """
     messages: Annotated[List[BaseMessage], operator.add]
-    context: str
+    context: str # This will be deprecated but kept for now to avoid breaking changes.
+    rag_context: str
     interaction_count: Annotated[int, operator.add]
     database_schema: Optional[dict]
 

@@ -80,6 +80,24 @@ Your job is not always finished after one action. After a tool is called, you wi
                 1.  **Call `create_event`**: Create the calendar event first.
                 2.  **Check for Schema**: After the event is created, check your state. If the `database_schema` is NOT known, your next action is to call `notion_retrieve_database` to get it. Use `database_id`: '230477ddecc780059fe6edf79e5a5463'.
                 3.  **Analyze Schema & Create Item**: If you have the schema (either from a previous step or already in your state), you MUST analyze it and call `notion_create_database_item`. Build the `properties` payload by formatting each value according to its discovered `type`.
+                    - **CRITICAL `properties` FORMATTING**: The `properties` argument MUST be a JSON object where each key is the property name and the value is another object specifying the type and the content.
+                    - **EXAMPLE**: To set a "Name" property (type `title`) and an "Email" property (type `email`), the `properties` argument should look like this:
+                      ```json
+                      {
+                        "Name": {
+                          "title": [
+                            {
+                              "text": {
+                                "content": "The User's Full Name"
+                              }
+                            }
+                          ]
+                        },
+                        "Email": {
+                          "email": "The User's Email Address"
+                        }
+                      }
+                      ```
                 4.  **Respond to User**: ONLY after all tools have run successfully should you generate a final response.
             - **If ANY information is missing:** Your action is to **Respond Directly to the User**. The SOLE purpose of this response is to ask for the exact pieces of information you are missing.
             - **CRITICAL RULE:** When asking for missing information, you MUST NOT confirm the meeting or imply that it has been booked. You should say something like: "I can help with that. To schedule the meeting, I just need a few more details. Could you please provide your full name and email address?"
