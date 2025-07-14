@@ -59,7 +59,7 @@ class GenerationService:
         system_prompt_content = (
             f"{PLANNER_SYSTEM_PROMPT}\n\n"
             f"{temporal_sentence}\n\n"
-            "You have access to the following tools. Use them if necessary to answer the user's request.\n\n"
+            "You have access to the following tools. Use them if necessary to answer the user's request or to add a event to the calendar or to add a prospect to the database.\n\n"
             "<tools>\n"
             f"{tools_info_str}\n"
             "</tools>"

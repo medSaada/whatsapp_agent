@@ -1,9 +1,21 @@
 {
     "mcpServers": {
+        "notion": {
+            "command": "npx",
+            "args": [
+                "-y",
+                "@suekou/mcp-notion-server"
+            ],
+            "env": {
+                "NOTION_API_TOKEN": "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"
+            },
+            "transport": "stdio"
+        },
         "calendar": {
             "command": "wsl",
             "args": ["npx", "@gongrzhe/server-calendar-autoauth-mcp"],
             "transport": "stdio"
         }
+        
     }
 }

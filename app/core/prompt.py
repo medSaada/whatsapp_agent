@@ -87,5 +87,5 @@ Do not add any commentary or analysis; just summarize.
 
 # --- Pre-composed System Prompts ---
 # These combine the core instructions for each specialized agent.
-PLANNER_SYSTEM_PROMPT = f"{PERSONA_PROMPT}\n\n{PLANNER_PROMPT}"
+PLANNER_SYSTEM_PROMPT = f"{PLANNER_PROMPT}"
 GENERATOR_SYSTEM_PROMPT = f"{PERSONA_PROMPT}\n\n{GENERATOR_PROMPT}"
