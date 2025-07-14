@@ -51,20 +51,21 @@ class RAGOrchestrator:
         checkpointer: AsyncSqliteSaver,
         vector_store_path: str,
         collection_name: str,
-        model_name: str,
+        planner_model_name: str,
+        generator_model_name: str,
         temperature: float,
-        memory_threshold: int,
     ) -> "RAGOrchestrator":
         """Asynchronously creates and initializes the RAGOrchestrator."""
         
-        llm = ChatOpenAI(model=model_name, temperature=temperature, api_key=settings.OPENAI_API_KEY)
+        planner_llm = ChatOpenAI(model=planner_model_name, temperature=temperature, api_key=settings.OPENAI_API_KEY)
+        generator_llm = ChatOpenAI(model=generator_model_name, temperature=temperature, api_key=settings.OPENAI_API_KEY)
         embeddings = OpenAIEmbeddings(model="text-embedding-ada-002", api_key=settings.OPENAI_API_KEY)
         
         vector_store_service = VectorStoreService(
             VectorStoreConfig(store_path=vector_store_path, collection_name=collection_name),
             embedding_model=embeddings
         )
-        generation_service = GenerationService(llm=llm)
+        generation_service = GenerationService(planner_llm=planner_llm, generator_llm=generator_llm)
 
         # Fetch all tools
         rag_tool = create_rag_tool(vector_store_service, collection_name)
@@ -75,7 +76,6 @@ class RAGOrchestrator:
         builder = GraphBuilder(
             generation_service=generation_service,
             tools=all_tools,
-            memory_threshold=memory_threshold,
             settings=settings
         )
         
@@ -133,7 +133,8 @@ class RAGOrchestrator:
 
         except Exception as e:
             logger.error(f"Error in async RAG flow for '{conversation_id}': {e}", exc_info=True)
-            return f"Désolé, j'ai rencontré une erreur: {str(e)}"
+            # Return a generic, user-friendly message instead of the raw error.
+            return "Désolé, une erreur technique est survenue. Notre équipe a été informée. Veuillez réessayer ou reformuler votre demande."
     
     def is_ready(self) -> bool:
         """Check if RAG system is ready by checking if the collection exists."""

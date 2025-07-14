@@ -1,4 +1,4 @@
-from typing import TypedDict, Annotated, List
+from typing import TypedDict, Annotated, List, Optional
 import operator
 from langchain_core.messages import BaseMessage
 
@@ -12,10 +12,12 @@ class AgentState(TypedDict):
                   to this list rather than overwriting it.
         context: The retrieved context from the vector store.
         interaction_count: Counter for tracking the number of interactions for memory management.
+        database_schema: Stores the Notion database schema once retrieved to avoid redundant calls.
     """
     messages: Annotated[List[BaseMessage], operator.add]
     context: str
     interaction_count: Annotated[int, operator.add]
+    database_schema: Optional[dict]
 
 def should_continue(state: AgentState) -> str:
     """

@@ -3,7 +3,7 @@ from datetime import datetime, timezone
 from typing import Any, List, Optional
 from app.core.logging import get_logger
 from langchain_core.output_parsers import JsonOutputParser
-from app.core.prompt import PLANNER_SYSTEM_PROMPT, GENERATOR_SYSTEM_PROMPT, SUMMARIZER_PROMPT
+from app.core.prompt import PLANNER_SYSTEM_PROMPT, GENERATOR_SYSTEM_PROMPT
 from langchain.prompts import ChatPromptTemplate, MessagesPlaceholder
 from langchain_core.documents import Document
 from langchain_core.messages import SystemMessage
@@ -21,25 +21,27 @@ Answer quality control
 class GenerationService:
     """Service for generating responses using LLM with RAG context"""
     
-    def __init__(self, llm: 'ChatOpenAI'):
+    def __init__(self, planner_llm: 'ChatOpenAI', generator_llm: 'ChatOpenAI'):
         """
-        Initialize GenerationService
+        Initialize GenerationService with separate models for planning and generation.
         
         Args:
-            llm: An initialized LangChain ChatOpenAI instance.
+            planner_llm: An initialized LangChain ChatOpenAI instance for the planner.
+            generator_llm: An initialized LangChain ChatOpenAI instance for the generator.
         """
-        if not llm:
-            raise ValueError("llm instance cannot be None")
+        if not planner_llm or not generator_llm:
+            raise ValueError("Both planner_llm and generator_llm instances cannot be None")
         
-        self.llm = llm
-        logger.info(f"GenerationService initialized with model: {self.llm.model_name}")
+        self.planner_llm = planner_llm
+        self.generator_llm = generator_llm
+        logger.info(f"GenerationService initialized with Planner: {self.planner_llm.model_name} and Generator: {self.generator_llm.model_name}")
 
     def get_planner_chain(self, tools: List[Any]) -> 'Runnable':
         """
         Creates a chain for the Planner node for ASYNC execution.
-        The LLM is bound to the tools, and the system prompt is simplified.
+        The planner LLM is bound to the tools.
         """
-        llm_with_tools = self.llm.bind_tools(tools)
+        llm_with_tools = self.planner_llm.bind_tools(tools)
 
         try:
             # Always use UTC for consistency
@@ -51,51 +53,47 @@ class GenerationService:
             now_utc = datetime.now(timezone.utc)
             temporal_sentence = f"Current date and time (UTC): {now_utc.strftime('%Y-%m-%d %H:%M')} UTC."
 
-        # Format tools into a JSON-like string for the prompt, as per the notebook example.
-        tool_descriptions = [tool.model_dump_json(include=["name", "description"]) for tool in tools]
-        tools_info_str = "\n".join(tool_descriptions)
-
-        # The system prompt now includes tool descriptions, along with the standard binding.
+        # The system prompt is now cleaner, letting bind_tools handle the heavy lifting.
         system_prompt_content = (
             f"{PLANNER_SYSTEM_PROMPT}\n\n"
-            f"{temporal_sentence}\n\n"
-            "You have access to the following tools. Use them if necessary to answer the user's request or to add a event to the calendar or to add a prospect to the database.\n\n"
-            "<tools>\n"
-            f"{tools_info_str}\n"
-            "</tools>"
+            "# Current State Information\n"
+            "You have access to the following state to help you make your decision. Use it to avoid repeating actions.\n"
+            "- Database Schema: {database_schema_status}\n\n"
+            f"{temporal_sentence}\n"
         )
         
-        # By creating a SystemMessage directly, we avoid template parsing issues with JSON braces.
         prompt = ChatPromptTemplate.from_messages([
             SystemMessage(content=system_prompt_content),
             MessagesPlaceholder(variable_name="messages")
         ])
-        
+
+        # We must update the input variables to include our new state key
+        prompt.input_variables.append("database_schema_status")
+
         return prompt | llm_with_tools
 
     def get_generator_chain(self) -> 'Runnable':
         """
         Creates a chain for the Generator node.
-        This chain crafts the final user-facing response.
+        This chain crafts the final user-facing response using the generator LLM.
         """
         prompt = ChatPromptTemplate.from_messages([
             ("system", GENERATOR_SYSTEM_PROMPT),
             MessagesPlaceholder(variable_name="messages")
         ])
-        return prompt | self.llm
-
-    def get_summarizer_chain(self) -> 'Runnable':
-        """
-        Creates a chain for summarizing conversation history.
-        """
-        prompt = ChatPromptTemplate.from_template(SUMMARIZER_PROMPT)
-        return prompt | self.llm
+        return prompt | self.generator_llm
 
     def get_model_info(self) -> dict:
-        """Get model information"""
+        """Get model information for both planner and generator"""
         return {
-            "model_name": self.llm.model_name,
-            "temperature": self.llm.temperature,
+            "planner_model": {
+                "model_name": self.planner_llm.model_name,
+                "temperature": self.planner_llm.temperature,
+            },
+            "generator_model": {
+                "model_name": self.generator_llm.model_name,
+                "temperature": self.generator_llm.temperature,
+            }
         }
     
 

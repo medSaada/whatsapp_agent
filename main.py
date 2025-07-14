@@ -63,9 +63,9 @@ async def lifespan(app: FastAPI):
             checkpointer=memory,
             vector_store_path="data/vector_store",
             collection_name="production_collection",
-            model_name="gpt-4.1",
-            temperature=0.2,
-            memory_threshold=6
+            planner_model_name="gpt-4o",
+            generator_model_name="gpt-4.1",
+            temperature=0.2
         )
         yield
     
